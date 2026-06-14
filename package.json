@@ -1,0 +1,9 @@
+{
+  "name": "superheli",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=14" },
+  "scripts": {
+    "test": "node tests/test_index.js"
+  }
+}
