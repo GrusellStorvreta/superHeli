@@ -1,7 +1,9 @@
 using System;
 using System.Reflection;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
+#endif
 
 // Lightweight MonoBehaviour wrapper to drive SimCore.Simulator from a Unity scene.
 // Adds Xbox controller mapping (legacy Input API), smoothing and websocket control frames.
@@ -156,6 +158,7 @@ namespace SimCore
 #if ENABLE_INPUT_SYSTEM
             // Prefer Gamepad.current (Input System) if available; otherwise fall back to legacy Input.GetAxis.
             bool usedInputSystem = false;
+#if ENABLE_INPUT_SYSTEM
             try
             {
                 var gp = Gamepad.current;
@@ -174,6 +177,7 @@ namespace SimCore
             {
                 usedInputSystem = false;
             }
+#endif
 
             if (!usedInputSystem)
             {
@@ -211,6 +215,7 @@ namespace SimCore
             bool kbCollectiveUp = false, kbCollectiveDown = false;
             bool kbPedalLeft = false, kbPedalRight = false;
 
+#if ENABLE_INPUT_SYSTEM
             // Prefer new Input System keyboard if available
             bool keyboardUsed = false;
             try
@@ -258,6 +263,26 @@ namespace SimCore
                     // No keyboard available via legacy API
                 }
             }
+#else
+            // Fall back to legacy Input API only
+            try
+            {
+                kbUp = Input.GetKey(KeyCode.UpArrow);
+                kbDown = Input.GetKey(KeyCode.DownArrow);
+                kbLeft = Input.GetKey(KeyCode.LeftArrow);
+                kbRight = Input.GetKey(KeyCode.RightArrow);
+
+                kbCollectiveUp = Input.GetKey(KeyCode.A);
+                kbCollectiveDown = Input.GetKey(KeyCode.Z);
+
+                kbPedalLeft = Input.GetKey(KeyCode.N);
+                kbPedalRight = Input.GetKey(KeyCode.M);
+            }
+            catch (Exception)
+            {
+                // No keyboard available via legacy API
+            }
+#endif
 
             // Map axes to control ranges
             // Collective: prefer keyboard control if A/Z pressed, otherwise use RIGHT stick vertical
