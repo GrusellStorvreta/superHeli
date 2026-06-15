@@ -13,6 +13,13 @@ public static class SimSceneCreator
     [MenuItem("Tools/Create Sample Scene")]
     public static void CreateSampleScene()
     {
+        // Cannot create scenes during play mode
+        if (EditorApplication.isPlaying)
+        {
+            EditorUtility.DisplayDialog("Error", "Cannot create scene during play mode. Please stop playing first.", "OK");
+            return;
+        }
+
         // Ensure Scenes folder exists inside Assets
         string scenesDir = Path.Combine(Application.dataPath, "Scenes");
         if (!Directory.Exists(scenesDir))
