@@ -8,7 +8,7 @@ namespace SimCore
     {
         public Vector2 margin = new Vector2(10, 10);
         public int fontSize = 14;
-        public Color fontColor = Color.white;
+        public Color fontColor = Color.black;
         public bool show = true;
 
         private SimulatorDriver driver;
