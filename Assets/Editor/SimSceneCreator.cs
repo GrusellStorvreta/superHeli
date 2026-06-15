@@ -27,6 +27,10 @@ public static class SimSceneCreator
         GameObject simGO = new GameObject("Simulator");
         simGO.AddComponent<SimCore.SimulatorDriver>();
 
+        // Add HUD to display cyclic, pedals, collective
+        GameObject hudGO = new GameObject("SimulatorHUD");
+        hudGO.AddComponent<SimCore.SimulatorHUD>();
+
         // Try to instantiate the MD-500 model from Assets/Models/MD500/MD-500.fbx as the player helicopter
         string heliPath = "Assets/Models/MD500/MD-500.fbx";
         var heliAsset = AssetDatabase.LoadAssetAtPath<GameObject>(heliPath);
