@@ -35,6 +35,14 @@ namespace SimCore
         {
             if (!show) return;
 
+            // Lazily initialize style if null
+            if (style == null)
+            {
+                style = new GUIStyle(GUI.skin.label);
+                style.fontSize = fontSize;
+                style.normal.textColor = fontColor;
+            }
+
             if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
             if (driver == null) return;
 
