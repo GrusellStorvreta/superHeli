@@ -98,6 +98,9 @@ namespace SimCore
         // The actual simulation core (assumed to be in namespace SimCore)
         private SimCore.Simulator simulator;
 
+        // Input adapter (reads from HeliControls.inputactions)
+        private HeliInput heliInput;
+
         // Accumulate delta for fixed-step stepping
         private double timeAccumulator = 0.0;
 
@@ -128,6 +131,13 @@ namespace SimCore
             {
                 simulator = new SimCore.Simulator();
             }
+
+            // Get or add HeliInput adapter that reads from InputActions
+            heliInput = GetComponent<HeliInput>();
+            if (heliInput == null)
+            {
+                heliInput = gameObject.AddComponent<HeliInput>();
+            }
         }
 
         void OnEnable()
@@ -150,85 +160,25 @@ namespace SimCore
             if (simulator == null)
                 simulator = new SimCore.Simulator();
 
+            if (heliInput == null)
+                return;
+
             float delta = Time.deltaTime;
 
-            // Sample raw inputs once per Update (legacy Input API)
-            // If enabled, attempt to auto-detect responsive axis names before sampling
-            if (enableAutoDetectAxes && !axesAutoDetected)
-            {
-                TryAutoDetectAxes();
-            }
+            // Read inputs from HeliInput (which uses InputActions + 1D Axis Composite for Yaw with proper left/right trigger mapping)
+            Vector2 cyclic = heliInput.move;
+            float rawCollective = heliInput.collective;
+            float rawPedal = heliInput.yaw; // Properly split left/right triggers via 1D Axis Composite
 
-            float rawLeftX = 0f;
-            float rawLeftY = 0f;
-            float rawRightX = 0f;
-            float rawRightY = 0f;
-            float rawLT = 0f;
-            float rawRT = 0f;
+            float rawCyclicX = cyclic.x;
+            float rawCyclicY = cyclic.y;
 
-#if ENABLE_INPUT_SYSTEM
-            // Prefer Gamepad.current (Input System) if available; otherwise fall back to legacy Input.GetAxis.
-            bool usedInputSystem = false;
-#if ENABLE_INPUT_SYSTEM
-            try
-            {
-                var gp = Gamepad.current;
-                if (gp != null)
-                {
-                    rawLeftX = gp.leftStick.ReadValue().x;
-                    rawLeftY = gp.leftStick.ReadValue().y;
-                    rawRightX = gp.rightStick.ReadValue().x;
-                    rawRightY = gp.rightStick.ReadValue().y;
-                    rawLT = gp.leftTrigger.ReadValue(); // 0..1
-                    rawRT = gp.rightTrigger.ReadValue(); // 0..1
-                    usedInputSystem = true;
-                }
-            }
-            catch (Exception)
-            {
-                usedInputSystem = false;
-            }
-#endif
-
-            if (!usedInputSystem)
-            {
-                try
-                {
-                    rawLeftX = Input.GetAxis(leftStickXAxis);
-                    rawLeftY = Input.GetAxis(leftStickYAxis);
-                    rawRightX = Input.GetAxis(rightStickXAxis);
-                    rawRightY = Input.GetAxis(rightStickYAxis);
-                    rawLT = Input.GetAxis(leftTriggerAxis);
-                    rawRT = Input.GetAxis(rightTriggerAxis);
-                }
-                catch (Exception)
-                {
-                    // Input axes may not be defined in Input Manager; fall back to zeros.
-                }
-            }
-            try
-            {
-                rawLeftX = Input.GetAxis(leftStickXAxis);
-                rawLeftY = Input.GetAxis(leftStickYAxis);
-                rawRightX = Input.GetAxis(rightStickXAxis);
-                rawRightY = Input.GetAxis(rightStickYAxis);
-                rawLT = Input.GetAxis(leftTriggerAxis);
-                rawRT = Input.GetAxis(rightTriggerAxis);
-            }
-            catch (Exception)
-            {
-                // Input axes may not be defined in Input Manager; fall back to zeros.
-            }
-#endif
-
-            // Keyboard input detection - prefer new Input System when available
+            // Keyboard override for cyclic and collective
             bool kbUp = false, kbDown = false, kbLeft = false, kbRight = false;
             bool kbCollectiveUp = false, kbCollectiveDown = false;
             bool kbPedalLeft = false, kbPedalRight = false;
 
 #if ENABLE_INPUT_SYSTEM
-            // Prefer new Input System keyboard if available
-            bool keyboardUsed = false;
             try
             {
                 var kb = Keyboard.current;
@@ -238,66 +188,36 @@ namespace SimCore
                     kbDown = kb.downArrowKey.isPressed;
                     kbLeft = kb.leftArrowKey.isPressed;
                     kbRight = kb.rightArrowKey.isPressed;
-
                     kbCollectiveUp = kb.aKey.isPressed;
                     kbCollectiveDown = kb.zKey.isPressed;
-
                     kbPedalLeft = kb.nKey.isPressed;
                     kbPedalRight = kb.mKey.isPressed;
-
-                    keyboardUsed = true;
                 }
             }
-            catch (Exception)
-            {
-                keyboardUsed = false;
-            }
-
-            if (!keyboardUsed)
-            {
-                // Fall back to legacy Input API (may throw if legacy input disabled)
-                try
-                {
-                    kbUp = Input.GetKey(KeyCode.UpArrow);
-                    kbDown = Input.GetKey(KeyCode.DownArrow);
-                    kbLeft = Input.GetKey(KeyCode.LeftArrow);
-                    kbRight = Input.GetKey(KeyCode.RightArrow);
-
-                    kbCollectiveUp = Input.GetKey(KeyCode.A);
-                    kbCollectiveDown = Input.GetKey(KeyCode.Z);
-
-                    kbPedalLeft = Input.GetKey(KeyCode.N);
-                    kbPedalRight = Input.GetKey(KeyCode.M);
-                }
-                catch (Exception)
-                {
-                    // No keyboard available via legacy API
-                }
-            }
+            catch { }
 #else
-            // Fall back to legacy Input API only
             try
             {
                 kbUp = Input.GetKey(KeyCode.UpArrow);
                 kbDown = Input.GetKey(KeyCode.DownArrow);
                 kbLeft = Input.GetKey(KeyCode.LeftArrow);
                 kbRight = Input.GetKey(KeyCode.RightArrow);
-
                 kbCollectiveUp = Input.GetKey(KeyCode.A);
                 kbCollectiveDown = Input.GetKey(KeyCode.Z);
-
                 kbPedalLeft = Input.GetKey(KeyCode.N);
                 kbPedalRight = Input.GetKey(KeyCode.M);
             }
-            catch (Exception)
-            {
-                // No keyboard available via legacy API
-            }
+            catch { }
 #endif
 
-            // Map axes to control ranges
-            // Collective: prefer keyboard control if A/Z pressed, otherwise use RIGHT stick vertical
-            float rawCollective;
+            // Override cyclic with keyboard arrows if pressed
+            if (kbLeft || kbRight || kbUp || kbDown)
+            {
+                rawCyclicX = (kbRight ? 1f : 0f) + (kbLeft ? -1f : 0f);
+                rawCyclicY = (kbUp ? 1f : 0f) + (kbDown ? -1f : 0f);
+            }
+
+            // Override collective with keyboard A/Z if pressed
             if (kbCollectiveUp || kbCollectiveDown)
             {
                 keyboardCollective += ((kbCollectiveUp ? 1f : 0f) - (kbCollectiveDown ? 1f : 0f)) * keyboardCollectiveRate * delta;
@@ -306,137 +226,29 @@ namespace SimCore
             }
             else
             {
-                rawCollective = Mathf.Clamp01((rawRightY + 1f) / 2f);
-                // keep keyboardCollective in sync if joystick is used
                 keyboardCollective = rawCollective;
             }
 
-            // Cyclic: arrow keys override joystick when held
-            float rawCyclicX = 0f;
-            float rawCyclicY = 0f;
-            if (kbLeft || kbRight || kbUp || kbDown)
-            {
-                rawCyclicX = (kbRight ? 1f : 0f) + (kbLeft ? -1f : 0f);
-                rawCyclicY = (kbUp ? 1f : 0f) + (kbDown ? -1f : 0f);
-            }
-            else
-            {
-                rawCyclicX = Mathf.Clamp(rawLeftX, -1f, 1f);
-                rawCyclicY = Mathf.Clamp(rawLeftY, -1f, 1f);
-            }
-
-            // Pedal: keyboard keys N (left) and M (right) map to -1/1 but with rate-limited change; if none pressed, use triggers
-            float rawPedal = 0f;
+            // Override pedal with keyboard N/M if pressed
             if (kbPedalLeft || kbPedalRight)
             {
                 float target = (kbPedalRight ? 1f : 0f) + (kbPedalLeft ? -1f : 0f);
-                // Move keyboardPedal toward target at keyboardPedalRate units/sec
                 if (keyboardPedal < target) keyboardPedal = Mathf.Min(target, keyboardPedal + keyboardPedalRate * delta);
                 else if (keyboardPedal > target) keyboardPedal = Mathf.Max(target, keyboardPedal - keyboardPedalRate * delta);
                 rawPedal = keyboardPedal;
-
-                // map keyboard to left/right trigger indicators (digital)
                 LastBufferedLeftTrigger = kbPedalLeft ? 1f : 0f;
                 LastBufferedRightTrigger = kbPedalRight ? 1f : 0f;
             }
             else
             {
-                // If triggers are mapped to the same combined axis (e.g., Axis 3), Input.GetAxis returns one value representing both triggers.
-                if (!string.IsNullOrEmpty(leftTriggerAxis) && leftTriggerAxis == rightTriggerAxis)
-                {
-                    // Combined trigger axis (one axis represents both triggers). Commonly centered at 0 with left negative, right positive.
-                    float combined = rawRT; // same as rawLT
-                    // Split combined into separate left/right trigger values in [0,1]
-                    float lt_val = combined < 0f ? -combined : 0f;
-                    float rt_val = combined > 0f ? combined : 0f;
-                        // Compute pedal as RT - LT in [-1,1]
-                    rawPedal = Mathf.Clamp(rt_val - lt_val, -1f, 1f);
-                    // Debug: log split trigger values to help diagnose missing left trigger
-                    Debug.Log($"SimulatorDriver: combined trigger axis '{leftTriggerAxis}'={combined:F3} -> lt_val={lt_val:F3}, rt_val={rt_val:F3}, rawPedal={rawPedal:F3}");
-
-                    // update buffered trigger indicators
-                    LastBufferedLeftTrigger = lt_val;
-                    LastBufferedRightTrigger = rt_val;
-
-                    // If left trigger never produces negative combined (lt_val==0) and we see RT responding,
-                    // start a short scan asking user to press the left trigger to find an alternative axis.
-                    if (Mathf.Approximately(lt_val, 0f) && rt_val > 0.01f && !combinedTriggerScanActive)
-                    {
-                        combinedTriggerScanActive = true;
-                        combinedTriggerScanEnd = Time.realtimeSinceStartupAsDouble + combinedTriggerScanDuration;
-                        combinedTriggerScanMax.Clear();
-                        foreach (var name in triggerCandidates) combinedTriggerScanMax[name] = 0f;
-                        Debug.Log("SimulatorDriver: Detected combined trigger appears right-only. Please press and hold the LEFT trigger now for 2 seconds to auto-detect its axis.");
-                    }
-
-                    // If a scan is active, update per-candidate maxima
-                    if (combinedTriggerScanActive)
-                    {
-                        double now = Time.realtimeSinceStartupAsDouble;
-                        foreach (var name in triggerCandidates)
-                        {
-                            float v = 0f;
-                            try { v = Input.GetAxis(name); } catch { continue; }
-                            combinedTriggerScanMax[name] = Mathf.Max(combinedTriggerScanMax[name], Mathf.Abs(v));
-                        }
-
-                        if (now >= combinedTriggerScanEnd)
-                        {
-                            // Select best candidate (excluding the currently used combined axis name)
-                            string best = null;
-                            float bestVal = 0f;
-                            foreach (var kv in combinedTriggerScanMax)
-                            {
-                                if (kv.Key == leftTriggerAxis) continue;
-                                if (kv.Value > bestVal)
-                                {
-                                    bestVal = kv.Value;
-                                    best = kv.Key;
-                                }
-                            }
-
-                            if (best != null && bestVal > combinedTriggerScanThreshold)
-                            {
-                                leftTriggerAxis = best;
-                                Debug.Log($"SimulatorDriver: Auto-detected left trigger axis '{best}' (max={bestVal:F3}). Updated mapping.");
-                                // re-read rawLT from new axis
-                                try { rawLT = Input.GetAxis(leftTriggerAxis); } catch { rawLT = 0f; }
-                                // recompute lt/rt and pedal
-                                float lt = rawLT; if (lt >= -1f && lt <= 1f) lt = (lt + 1f) / 2f;
-                                float rt = rawRT; if (rt >= -1f && rt <= 1f) rt = (rt + 1f) / 2f;
-                                rawPedal = Mathf.Clamp(rt - lt, -1f, 1f);
-                            }
-                            else
-                            {
-                                Debug.Log("SimulatorDriver: Left trigger scan did not find a responsive axis.");
-                            }
-
-                            combinedTriggerScanActive = false;
-                        }
-                    }
-
-                    // keep keyboardPedal in sync when switching back to joystick
-                    keyboardPedal = rawPedal;
-                }                else
-                {
-                    // Handle triggers that may return -1..1 (convert to 0..1) or already 0..1.
-                    float lt = rawLT;
-                    float rt = rawRT;
-                    if (lt >= -1f && lt <= 1f) lt = (lt + 1f) / 2f;
-                    if (rt >= -1f && rt <= 1f) rt = (rt + 1f) / 2f;
-                    rawPedal = (rt - lt);
-                    // keep keyboardPedal in sync when switching back to joystick
-                    keyboardPedal = rawPedal;
-
-                    // update buffered trigger indicators
-                    LastBufferedLeftTrigger = lt;
-                    LastBufferedRightTrigger = rt;
-                }
+                keyboardPedal = rawPedal;
+                // Extract left/right trigger values from pedal (yaw is right - left from 1D Axis Composite)
+                // For display: extract as simple split (assuming range -1..1)
+                float lt = Mathf.Max(0f, -rawPedal); // negative = left trigger
+                float rt = Mathf.Max(0f, rawPedal);  // positive = right trigger
+                LastBufferedLeftTrigger = lt;
+                LastBufferedRightTrigger = rt;
             }
-
-            rawPedal = Mathf.Clamp(rawPedal, -1f, 1f);
-
-            if (useFixedTimestep)
             {
                 timeAccumulator += delta;
                 while (timeAccumulator >= dt)
