@@ -6,63 +6,56 @@ using UnityEngine.InputSystem;
 namespace SimCore
 {
     // Adapter MonoBehaviour that exposes simple input properties using the new Unity Input System.
-    // Place this on a GameObject to make Heli input accessible to other scripts.
+    // If the Input System package is not present, falls back to legacy Input API.
     public class HeliInput : MonoBehaviour
     {
-#if ENABLE_INPUT_SYSTEM
-        private HeliControls controls;
-#endif
-
         public Vector2 move { get; private set; }
         public float collective { get; private set; }
         public float yaw { get; private set; }
 
-        void Awake()
-        {
-#if ENABLE_INPUT_SYSTEM
-            controls = new HeliControls();
-#endif
-        }
-
-        void OnEnable()
-        {
-#if ENABLE_INPUT_SYSTEM
-            controls.Enable();
-
-            controls.Player.Move.performed += ctx => move = ctx.ReadValue<Vector2>();
-            controls.Player.Move.canceled  += ctx => move = Vector2.zero;
-
-            controls.Player.Collective.performed += ctx => collective = ctx.ReadValue<float>();
-            controls.Player.Collective.canceled  += ctx => collective = 0f;
-
-            controls.Player.Yaw.performed += ctx => yaw = ctx.ReadValue<float>();
-            controls.Player.Yaw.canceled  += ctx => yaw = 0f;
-#endif
-        }
-
-        void OnDisable()
-        {
-#if ENABLE_INPUT_SYSTEM
-            controls.Disable();
-#endif
-        }
-
         void Update()
         {
 #if ENABLE_INPUT_SYSTEM
-            // Also sample Gamepad & Keyboard directly as fallback for producer/diagnostics
-            var gp = Gamepad.current;
-            if (gp != null)
+            // Prefer Gamepad.current
+            try
             {
-                move = gp.leftStick.ReadValue();
-                collective = gp.rightStick.ReadValue().y * 0.5f + 0.5f; // map [-1,1] -> [0,1]
-                yaw = gp.rightTrigger.ReadValue() - gp.leftTrigger.ReadValue();
-            }
-            else
-            {
-                // if no gamepad, ensure values from actions remain
-            }
+                var gp = Gamepad.current;
+                if (gp != null)
+                {
+                    move = gp.leftStick.ReadValue();
+                    collective = gp.rightStick.ReadValue().y * 0.5f + 0.5f; // map [-1,1] -> [0,1]
+                    yaw = gp.rightTrigger.ReadValue() - gp.leftTrigger.ReadValue(); // -1..1? triggers 0..1 so diff in [-1,1]
+                    return;
+                }
+
+                // Fallback to keyboard using Input System
+                var kb = Keyboard.current;
+                if (kb != null)
+                {
+                    move = new Vector2((kb.rightArrowKey.isPressed ? 1f : 0f) - (kb.leftArrowKey.isPressed ? 1f : 0f),
+                                       (kb.upArrowKey.isPressed ? 1f : 0f) - (kb.downArrowKey.isPressed ? 1f : 0f));
+                    // collective mapped to A/Z
+                    collective = (kb.aKey.isPressed ? 1f : 0f) - (kb.zKey.isPressed ? 1f : 0f);
+                    yaw = (kb.mKey.isPressed ? 1f : 0f) - (kb.nKey.isPressed ? 1f : 0f);
+                    return;
+                }
 #endif
+
+            // Legacy fallback (when Input System not enabled)
+            try
+            {
+                float leftX = Input.GetAxis("Horizontal");
+                float leftY = Input.GetAxis("Vertical");
+                move = new Vector2(leftX, leftY);
+                collective = (Input.GetAxis("Axis 5") + 1f) * 0.5f; // Right stick Y -> Axis 5
+                // Combined triggers Axis 3 assumed
+                float combined = Input.GetAxis("Axis 3");
+                yaw = combined; // pass through
+            }
+            catch (System.Exception)
+            {
+                // ignore
+            }
         }
     }
 }
