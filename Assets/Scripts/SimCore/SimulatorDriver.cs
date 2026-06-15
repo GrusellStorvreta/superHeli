@@ -117,6 +117,10 @@ namespace SimCore
         // Buffered control state when Simulator.SetControlInput is not available.
         public ControlInput LastBufferedControl { get; private set; } = new ControlInput();
 
+        // Per-trigger buffered raw values (0..1) for HUD and external use
+        public float LastBufferedLeftTrigger { get; private set; } = 0f;
+        public float LastBufferedRightTrigger { get; private set; } = 0f;
+
         void Awake()
         {
             // Instantiate simulator core
@@ -330,6 +334,10 @@ namespace SimCore
                 if (keyboardPedal < target) keyboardPedal = Mathf.Min(target, keyboardPedal + keyboardPedalRate * delta);
                 else if (keyboardPedal > target) keyboardPedal = Mathf.Max(target, keyboardPedal - keyboardPedalRate * delta);
                 rawPedal = keyboardPedal;
+
+                // map keyboard to left/right trigger indicators (digital)
+                LastBufferedLeftTrigger = kbPedalLeft ? 1f : 0f;
+                LastBufferedRightTrigger = kbPedalRight ? 1f : 0f;
             }
             else
             {
@@ -345,6 +353,10 @@ namespace SimCore
                     rawPedal = Mathf.Clamp(rt_val - lt_val, -1f, 1f);
                     // Debug: log split trigger values to help diagnose missing left trigger
                     Debug.Log($"SimulatorDriver: combined trigger axis '{leftTriggerAxis}'={combined:F3} -> lt_val={lt_val:F3}, rt_val={rt_val:F3}, rawPedal={rawPedal:F3}");
+
+                    // update buffered trigger indicators
+                    LastBufferedLeftTrigger = lt_val;
+                    LastBufferedRightTrigger = rt_val;
 
                     // If left trigger never produces negative combined (lt_val==0) and we see RT responding,
                     // start a short scan asking user to press the left trigger to find an alternative axis.
@@ -415,6 +427,10 @@ namespace SimCore
                     rawPedal = (rt - lt);
                     // keep keyboardPedal in sync when switching back to joystick
                     keyboardPedal = rawPedal;
+
+                    // update buffered trigger indicators
+                    LastBufferedLeftTrigger = lt;
+                    LastBufferedRightTrigger = rt;
                 }
             }
 
