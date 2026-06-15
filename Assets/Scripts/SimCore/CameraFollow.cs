@@ -6,7 +6,7 @@ namespace SimCore
     public class CameraFollow : MonoBehaviour
     {
         public Transform target;
-        public Vector3 offset = new Vector3(0f, 3f, -8f);
+        public Vector3 offset = new Vector3(0f, 5f, -12f);
         public float followSpeed = 6f;
         public float lookDamp = 6f;
 

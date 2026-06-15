@@ -80,7 +80,7 @@ public static class SimSceneCreator
             var follow = mainCam.GetComponent<SimCore.CameraFollow>();
             if (follow == null) follow = mainCam.gameObject.AddComponent<SimCore.CameraFollow>();
             follow.target = heliInstance.transform;
-            follow.offset = new Vector3(0f, 3f, -8f);
+            follow.offset = new Vector3(0f, 5f, -12f);
             mainCam.transform.position = heliInstance.transform.position + follow.offset;
             mainCam.transform.LookAt(heliInstance.transform.position + Vector3.up * 1.5f);
         }
