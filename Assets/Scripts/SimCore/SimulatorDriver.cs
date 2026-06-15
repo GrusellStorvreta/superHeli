@@ -60,6 +60,13 @@ namespace SimCore
         // Internal per-axis detection flags
         private bool leftXDetected = false, leftYDetected = false, rightYDetected = false, triggersDetected = false;
 
+        // Combined-trigger left-trigger scanning support
+        private bool combinedTriggerScanActive = false;
+        private double combinedTriggerScanEnd = 0.0;
+        private double combinedTriggerScanDuration = 2.0; // seconds to ask user to press left trigger
+        private System.Collections.Generic.Dictionary<string, float> combinedTriggerScanMax = new System.Collections.Generic.Dictionary<string, float>();
+        private float combinedTriggerScanThreshold = 0.05f; // threshold to consider axis responsive
+
         [Tooltip("Entity id to tag control input for simulator.SetControlInput(entityId, control)")]
         public string controlEntityId = "player";
 
@@ -334,14 +341,71 @@ namespace SimCore
                     // Split combined into separate left/right trigger values in [0,1]
                     float lt_val = combined < 0f ? -combined : 0f;
                     float rt_val = combined > 0f ? combined : 0f;
-                    // Compute pedal as RT - LT in [-1,1]
+                        // Compute pedal as RT - LT in [-1,1]
                     rawPedal = Mathf.Clamp(rt_val - lt_val, -1f, 1f);
                     // Debug: log split trigger values to help diagnose missing left trigger
                     Debug.Log($"SimulatorDriver: combined trigger axis '{leftTriggerAxis}'={combined:F3} -> lt_val={lt_val:F3}, rt_val={rt_val:F3}, rawPedal={rawPedal:F3}");
+
+                    // If left trigger never produces negative combined (lt_val==0) and we see RT responding,
+                    // start a short scan asking user to press the left trigger to find an alternative axis.
+                    if (Mathf.Approximately(lt_val, 0f) && rt_val > 0.01f && !combinedTriggerScanActive)
+                    {
+                        combinedTriggerScanActive = true;
+                        combinedTriggerScanEnd = Time.realtimeSinceStartupAsDouble + combinedTriggerScanDuration;
+                        combinedTriggerScanMax.Clear();
+                        foreach (var name in triggerCandidates) combinedTriggerScanMax[name] = 0f;
+                        Debug.Log("SimulatorDriver: Detected combined trigger appears right-only. Please press and hold the LEFT trigger now for 2 seconds to auto-detect its axis.");
+                    }
+
+                    // If a scan is active, update per-candidate maxima
+                    if (combinedTriggerScanActive)
+                    {
+                        double now = Time.realtimeSinceStartupAsDouble;
+                        foreach (var name in triggerCandidates)
+                        {
+                            float v = 0f;
+                            try { v = Input.GetAxis(name); } catch { continue; }
+                            combinedTriggerScanMax[name] = Mathf.Max(combinedTriggerScanMax[name], Mathf.Abs(v));
+                        }
+
+                        if (now >= combinedTriggerScanEnd)
+                        {
+                            // Select best candidate (excluding the currently used combined axis name)
+                            string best = null;
+                            float bestVal = 0f;
+                            foreach (var kv in combinedTriggerScanMax)
+                            {
+                                if (kv.Key == leftTriggerAxis) continue;
+                                if (kv.Value > bestVal)
+                                {
+                                    bestVal = kv.Value;
+                                    best = kv.Key;
+                                }
+                            }
+
+                            if (best != null && bestVal > combinedTriggerScanThreshold)
+                            {
+                                leftTriggerAxis = best;
+                                Debug.Log($"SimulatorDriver: Auto-detected left trigger axis '{best}' (max={bestVal:F3}). Updated mapping.");
+                                // re-read rawLT from new axis
+                                try { rawLT = Input.GetAxis(leftTriggerAxis); } catch { rawLT = 0f; }
+                                // recompute lt/rt and pedal
+                                float lt = rawLT; if (lt >= -1f && lt <= 1f) lt = (lt + 1f) / 2f;
+                                float rt = rawRT; if (rt >= -1f && rt <= 1f) rt = (rt + 1f) / 2f;
+                                rawPedal = Mathf.Clamp(rt - lt, -1f, 1f);
+                            }
+                            else
+                            {
+                                Debug.Log("SimulatorDriver: Left trigger scan did not find a responsive axis.");
+                            }
+
+                            combinedTriggerScanActive = false;
+                        }
+                    }
+
                     // keep keyboardPedal in sync when switching back to joystick
                     keyboardPedal = rawPedal;
-                }
-                else
+                }                else
                 {
                     // Handle triggers that may return -1..1 (convert to 0..1) or already 0..1.
                     float lt = rawLT;
