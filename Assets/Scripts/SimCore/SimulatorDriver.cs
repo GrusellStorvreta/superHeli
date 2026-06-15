@@ -1,9 +1,7 @@
 using System;
 using System.Reflection;
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
-#endif
 
 // Lightweight MonoBehaviour wrapper to drive SimCore.Simulator from a Unity scene.
 // Adds Xbox controller mapping (legacy Input API), smoothing and websocket control frames.
@@ -156,7 +154,8 @@ namespace SimCore
             float rawRT = 0f;
 
 #if ENABLE_INPUT_SYSTEM
-            // If Input System package is active, prefer Gamepad.current for reliable axis reads
+            // Prefer Gamepad.current (Input System) if available; otherwise fall back to legacy Input.GetAxis.
+            bool usedInputSystem = false;
             try
             {
                 var gp = Gamepad.current;
@@ -168,10 +167,18 @@ namespace SimCore
                     rawRightY = gp.rightStick.ReadValue().y;
                     rawLT = gp.leftTrigger.ReadValue(); // 0..1
                     rawRT = gp.rightTrigger.ReadValue(); // 0..1
+                    usedInputSystem = true;
                 }
-                else
+            }
+            catch (Exception)
+            {
+                usedInputSystem = false;
+            }
+
+            if (!usedInputSystem)
+            {
+                try
                 {
-                    // Fall back to legacy Input.GetAxis when no gamepad detected
                     rawLeftX = Input.GetAxis(leftStickXAxis);
                     rawLeftY = Input.GetAxis(leftStickYAxis);
                     rawRightX = Input.GetAxis(rightStickXAxis);
@@ -179,12 +186,11 @@ namespace SimCore
                     rawLT = Input.GetAxis(leftTriggerAxis);
                     rawRT = Input.GetAxis(rightTriggerAxis);
                 }
+                catch (Exception)
+                {
+                    // Input axes may not be defined in Input Manager; fall back to zeros.
+                }
             }
-            catch (Exception)
-            {
-                // Fall back to zeros on error
-            }
-#else
             try
             {
                 rawLeftX = Input.GetAxis(leftStickXAxis);
@@ -201,29 +207,57 @@ namespace SimCore
 #endif
 
             // Keyboard input detection - prefer new Input System when available
-#if ENABLE_INPUT_SYSTEM
-            bool kbUp = Keyboard.current != null && Keyboard.current.upArrowKey.isPressed;
-            bool kbDown = Keyboard.current != null && Keyboard.current.downArrowKey.isPressed;
-            bool kbLeft = Keyboard.current != null && Keyboard.current.leftArrowKey.isPressed;
-            bool kbRight = Keyboard.current != null && Keyboard.current.rightArrowKey.isPressed;
+            bool kbUp = false, kbDown = false, kbLeft = false, kbRight = false;
+            bool kbCollectiveUp = false, kbCollectiveDown = false;
+            bool kbPedalLeft = false, kbPedalRight = false;
 
-            bool kbCollectiveUp = Keyboard.current != null && Keyboard.current.aKey.isPressed;
-            bool kbCollectiveDown = Keyboard.current != null && Keyboard.current.zKey.isPressed;
+            // Prefer new Input System keyboard if available
+            bool keyboardUsed = false;
+            try
+            {
+                var kb = Keyboard.current;
+                if (kb != null)
+                {
+                    kbUp = kb.upArrowKey.isPressed;
+                    kbDown = kb.downArrowKey.isPressed;
+                    kbLeft = kb.leftArrowKey.isPressed;
+                    kbRight = kb.rightArrowKey.isPressed;
 
-            bool kbPedalLeft = Keyboard.current != null && Keyboard.current.nKey.isPressed;
-            bool kbPedalRight = Keyboard.current != null && Keyboard.current.mKey.isPressed;
-#else
-            bool kbUp = Input.GetKey(KeyCode.UpArrow);
-            bool kbDown = Input.GetKey(KeyCode.DownArrow);
-            bool kbLeft = Input.GetKey(KeyCode.LeftArrow);
-            bool kbRight = Input.GetKey(KeyCode.RightArrow);
+                    kbCollectiveUp = kb.aKey.isPressed;
+                    kbCollectiveDown = kb.zKey.isPressed;
 
-            bool kbCollectiveUp = Input.GetKey(KeyCode.A);
-            bool kbCollectiveDown = Input.GetKey(KeyCode.Z);
+                    kbPedalLeft = kb.nKey.isPressed;
+                    kbPedalRight = kb.mKey.isPressed;
 
-            bool kbPedalLeft = Input.GetKey(KeyCode.N);
-            bool kbPedalRight = Input.GetKey(KeyCode.M);
-#endif
+                    keyboardUsed = true;
+                }
+            }
+            catch (Exception)
+            {
+                keyboardUsed = false;
+            }
+
+            if (!keyboardUsed)
+            {
+                // Fall back to legacy Input API (may throw if legacy input disabled)
+                try
+                {
+                    kbUp = Input.GetKey(KeyCode.UpArrow);
+                    kbDown = Input.GetKey(KeyCode.DownArrow);
+                    kbLeft = Input.GetKey(KeyCode.LeftArrow);
+                    kbRight = Input.GetKey(KeyCode.RightArrow);
+
+                    kbCollectiveUp = Input.GetKey(KeyCode.A);
+                    kbCollectiveDown = Input.GetKey(KeyCode.Z);
+
+                    kbPedalLeft = Input.GetKey(KeyCode.N);
+                    kbPedalRight = Input.GetKey(KeyCode.M);
+                }
+                catch (Exception)
+                {
+                    // No keyboard available via legacy API
+                }
+            }
 
             // Map axes to control ranges
             // Collective: prefer keyboard control if A/Z pressed, otherwise use RIGHT stick vertical
