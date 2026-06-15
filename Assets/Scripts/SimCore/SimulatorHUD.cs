@@ -39,9 +39,9 @@ namespace SimCore
             if (driver == null) return;
 
             var ctrl = driver.LastBufferedControl;
-            float cyclicX = ctrl.cyclic_x;
-            float cyclicY = ctrl.cyclic_y;
-            float collective = ctrl.collective;
+            float cyclicX = (float)ctrl.cyclic_x;
+            float cyclicY = (float)ctrl.cyclic_y;
+            float collective = (float)ctrl.collective;
             float left = driver.LastBufferedLeftTrigger;
             float right = driver.LastBufferedRightTrigger;
 
