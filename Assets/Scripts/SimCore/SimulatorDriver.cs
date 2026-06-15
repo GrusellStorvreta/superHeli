@@ -336,6 +336,8 @@ namespace SimCore
                     float rt_val = combined > 0f ? combined : 0f;
                     // Compute pedal as RT - LT in [-1,1]
                     rawPedal = Mathf.Clamp(rt_val - lt_val, -1f, 1f);
+                    // Debug: log split trigger values to help diagnose missing left trigger
+                    Debug.Log($"SimulatorDriver: combined trigger axis '{leftTriggerAxis}'={combined:F3} -> lt_val={lt_val:F3}, rt_val={rt_val:F3}, rawPedal={rawPedal:F3}");
                     // keep keyboardPedal in sync when switching back to joystick
                     keyboardPedal = rawPedal;
                 }
