@@ -329,10 +329,13 @@ namespace SimCore
                 // If triggers are mapped to the same combined axis (e.g., Axis 3), Input.GetAxis returns one value representing both triggers.
                 if (!string.IsNullOrEmpty(leftTriggerAxis) && leftTriggerAxis == rightTriggerAxis)
                 {
-                    // Use the combined axis value directly as pedal input. Assumes combined axis is in [-1,1] or 0..1; normalize if needed.
+                    // Combined trigger axis (one axis represents both triggers). Commonly centered at 0 with left negative, right positive.
                     float combined = rawRT; // same as rawLT
-                    // If combined seems to be in -1..1 and centered near 0, use as-is; if centered near -1, remap from [-1,1] -> [-1,1]
-                    rawPedal = Mathf.Clamp(combined, -1f, 1f);
+                    // Split combined into separate left/right trigger values in [0,1]
+                    float lt_val = combined < 0f ? -combined : 0f;
+                    float rt_val = combined > 0f ? combined : 0f;
+                    // Compute pedal as RT - LT in [-1,1]
+                    rawPedal = Mathf.Clamp(rt_val - lt_val, -1f, 1f);
                     // keep keyboardPedal in sync when switching back to joystick
                     keyboardPedal = rawPedal;
                 }
