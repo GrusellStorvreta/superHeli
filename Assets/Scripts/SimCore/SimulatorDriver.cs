@@ -249,6 +249,8 @@ namespace SimCore
                 LastBufferedLeftTrigger = lt;
                 LastBufferedRightTrigger = rt;
             }
+
+            if (useFixedTimestep)
             {
                 timeAccumulator += delta;
                 while (timeAccumulator >= dt)
