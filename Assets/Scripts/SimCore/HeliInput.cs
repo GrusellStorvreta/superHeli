@@ -12,12 +12,14 @@ namespace SimCore
         public Vector2 move { get; private set; }
         public float collective { get; private set; }
         public float yaw { get; private set; }
+        public bool resetPressed { get; private set; }
 
 #if ENABLE_INPUT_SYSTEM
         private InputActionAsset _actionsAsset;
         private InputAction _moveAction;
         private InputAction _collectiveAction;
         private InputAction _yawAction;
+        private InputAction _resetAction;
 
         void Awake()
         {
@@ -34,10 +36,12 @@ namespace SimCore
                         _moveAction = map.FindAction("Move");
                         _collectiveAction = map.FindAction("Collective");
                         _yawAction = map.FindAction("Yaw");
+                        _resetAction = map.FindAction("Reset");
 
                         _moveAction?.Enable();
                         _collectiveAction?.Enable();
                         _yawAction?.Enable();
+                        _resetAction?.Enable();
 
                         Debug.Log("HeliInput: Loaded InputActionAsset from Resources/HeliControls.inputactions");
                     }
@@ -54,6 +58,7 @@ namespace SimCore
             _moveAction?.Disable();
             _collectiveAction?.Disable();
             _yawAction?.Disable();
+            _resetAction?.Disable();
         }
 #endif
 
@@ -66,6 +71,9 @@ namespace SimCore
                 move = _moveAction.ReadValue<Vector2>();
                 collective = _collectiveAction != null ? _collectiveAction.ReadValue<float>() : 0f;
                 yaw = _yawAction != null ? _yawAction.ReadValue<float>() : 0f;
+                resetPressed = _resetAction != null
+                    ? _resetAction.WasPressedThisFrame()
+                    : FallbackResetPressed();
                 return;
             }
 
@@ -74,8 +82,9 @@ namespace SimCore
             if (gp != null)
             {
                 move = gp.leftStick.ReadValue();
-                collective = gp.rightStick.ReadValue().y * 0.5f + 0.5f; // map [-1,1] -> [0,1]
-                yaw = gp.rightTrigger.ReadValue() - gp.leftTrigger.ReadValue(); // triggers 0..1 so diff in [-1,1]
+                collective = gp.rightStick.ReadValue().y * 0.5f + 0.5f;
+                yaw = gp.rightTrigger.ReadValue() - gp.leftTrigger.ReadValue();
+                resetPressed = FallbackResetPressed();
                 return;
             }
 
@@ -85,9 +94,9 @@ namespace SimCore
             {
                 move = new Vector2((kb.rightArrowKey.isPressed ? 1f : 0f) - (kb.leftArrowKey.isPressed ? 1f : 0f),
                                    (kb.upArrowKey.isPressed ? 1f : 0f) - (kb.downArrowKey.isPressed ? 1f : 0f));
-                // collective mapped to A/Z (hold)
                 collective = (kb.aKey.isPressed ? 1f : 0f) - (kb.zKey.isPressed ? 1f : 0f);
                 yaw = (kb.mKey.isPressed ? 1f : 0f) - (kb.nKey.isPressed ? 1f : 0f);
+                resetPressed = FallbackResetPressed();
                 return;
             }
 #else
@@ -108,5 +117,14 @@ namespace SimCore
             }
 #endif
         }
+
+#if ENABLE_INPUT_SYSTEM
+        private bool FallbackResetPressed()
+        {
+            if (Keyboard.current != null && Keyboard.current.bKey.wasPressedThisFrame) return true;
+            if (Gamepad.current != null && Gamepad.current.buttonEast.wasPressedThisFrame) return true;
+            return false;
+        }
+#endif
     }
 }

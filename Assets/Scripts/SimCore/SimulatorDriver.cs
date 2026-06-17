@@ -155,6 +155,17 @@ namespace SimCore
 
             try { SendControlJson(control); } catch { }
             try { websocketClient?.DispatchMessageQueue(); } catch { }
+
+            if (heliInput.resetPressed) ResetToSpawnPoint();
+        }
+
+        void ResetToSpawnPoint()
+        {
+            if (spawnPoint == null) return;
+            rb.position = spawnPoint.position;
+            rb.rotation = spawnPoint.rotation;
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
         }
 
         void FixedUpdate()
