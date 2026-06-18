@@ -159,7 +159,7 @@ namespace SimCore
             if (heliInput.resetPressed) ResetToSpawnPoint();
         }
 
-        void ResetToSpawnPoint()
+        public void ResetToSpawnPoint()
         {
             if (spawnPoint == null) return;
             rb.position = spawnPoint.position;
