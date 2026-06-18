@@ -162,10 +162,16 @@ namespace SimCore
         public void ResetToSpawnPoint()
         {
             if (spawnPoint == null) return;
-            rb.position = spawnPoint.position;
-            rb.rotation = spawnPoint.rotation;
-            rb.velocity = Vector3.zero;
+            rb.position        = spawnPoint.position;
+            rb.rotation        = spawnPoint.rotation;
+            rb.velocity        = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+            sm_collective    = 0f;
+            sm_cyclic_x      = 0f;
+            sm_cyclic_y      = 0f;
+            sm_pedal         = 0f;
+            keyboardCollective = 0.5f;
+            keyboardPedal      = 0f;
         }
 
         void FixedUpdate()
