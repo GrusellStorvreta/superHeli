@@ -12,17 +12,25 @@ namespace SimCore
         private GUIStyle labelStyle;
         private GUIStyle boxStyle;
         private Texture2D bgTexture;
+        private Texture2D gimbalBgTexture;
+        private Texture2D dotTexture;
 
         private const float MsToKnots = 1.94384f;
         private const float MToFeet   = 3.28084f;
+        private const float MaxTilt   = 45f;
+
+        private const int   GimbalTexSize  = 90;
+        private const int   GimbalOuterR   = 40;
+        private const int   GimbalInnerR   = 16;
+        private const float GimbalDispSize = 90f;
+        private const int   DotTexSize     = 11;
+        private const float DotDispSize    = 11f;
 
         void OnEnable() => BuildStyles();
 
         void BuildStyles()
         {
-            bgTexture = new Texture2D(1, 1);
-            bgTexture.SetPixel(0, 0, new Color(0.04f, 0.06f, 0.1f, 0.82f));
-            bgTexture.Apply();
+            bgTexture = MakeFillTexture(new Color(0.04f, 0.06f, 0.1f, 0.82f));
 
             boxStyle = new GUIStyle(GUI.skin.box);
             boxStyle.normal.background = bgTexture;
@@ -30,12 +38,15 @@ namespace SimCore
             Color amber = new Color(1f, 0.78f, 0.08f);
             labelStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize   = fontSize,
-                fontStyle  = FontStyle.Bold,
-                alignment  = TextAnchor.MiddleLeft,
-                richText   = true
+                fontSize  = fontSize,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleLeft,
+                richText  = true
             };
             labelStyle.normal.textColor = amber;
+
+            gimbalBgTexture = MakeGimbalTexture(GimbalTexSize, GimbalOuterR, GimbalInnerR, amber);
+            dotTexture      = MakeDotTexture(DotTexSize, amber);
         }
 
         void OnGUI()
@@ -49,40 +60,118 @@ namespace SimCore
             Vector3 pos = driver.LastBodyPosition;
             Quaternion rot = driver.LastBodyRotation;
 
+            // Flight data
             float heading    = rot.eulerAngles.y;
             float fwdSpeed   = Vector3.Dot(vel, rot * Vector3.forward);
             float airspeedKt = fwdSpeed * MsToKnots;
             float vsFpm      = vel.y * MToFeet * 60f;
             float altFt      = pos.y * MToFeet;
 
-            string[] rows = new string[]
+            // Attitude (normalize euler to -180..180)
+            Vector3 euler = rot.eulerAngles;
+            float pitch = euler.x > 180f ? -(360f - euler.x) : -euler.x; // + = nose up on display
+            float roll  = euler.z > 180f ? -(360f - euler.z) :  euler.z; // + = right on display
+            pitch = Mathf.Clamp(pitch, -MaxTilt, MaxTilt);
+            roll  = Mathf.Clamp(roll,  -MaxTilt, MaxTilt);
+
+            // Layout
+            float lineH    = fontSize + 10f;
+            float textW    = 172f;
+            float padding  = 12f;
+            float panelH   = Mathf.Max(lineH * 4 + 14f, GimbalDispSize + 14f);
+            float panelW   = textW + GimbalDispSize + padding * 2f;
+            float x = position.x;
+            float y = position.y;
+
+            GUI.Box(new Rect(x, y, panelW, panelH), GUIContent.none, boxStyle);
+
+            // Text rows
+            float textY = y + (panelH - lineH * 4) * 0.5f;
+            string[] rows =
             {
                 FormatRow("HDG", $"{heading:000}°"),
                 FormatRow("SPD", $"{Sign(airspeedKt)}{Mathf.Abs(airspeedKt):F0} kt"),
                 FormatRow("V/S", $"{Sign(vsFpm)}{Mathf.Abs(vsFpm):F0} fpm"),
                 FormatRow("ALT", $"{altFt:F0} ft"),
             };
-
-            float lineH  = fontSize + 10f;
-            float panelW = 172f;
-            float panelH = lineH * rows.Length + 14f;
-            float x = position.x;
-            float y = position.y;
-
-            GUI.Box(new Rect(x, y, panelW, panelH), GUIContent.none, boxStyle);
-
             for (int i = 0; i < rows.Length; i++)
-                GUI.Label(new Rect(x + 12f, y + 7f + i * lineH, panelW - 16f, lineH), rows[i], labelStyle);
+                GUI.Label(new Rect(x + padding, textY + i * lineH, textW, lineH), rows[i], labelStyle);
+
+            // Gimbal
+            float gx = x + textW + padding;
+            float gy = y + (panelH - GimbalDispSize) * 0.5f;
+            GUI.DrawTexture(new Rect(gx, gy, GimbalDispSize, GimbalDispSize), gimbalBgTexture);
+
+            // Dot position: map tilt to display coords
+            float scale = (GimbalDispSize * 0.5f * GimbalOuterR / GimbalTexSize) / MaxTilt;
+            float cx = gx + GimbalDispSize * 0.5f;
+            float cy = gy + GimbalDispSize * 0.5f;
+            float dx = cx + roll  * scale - DotDispSize * 0.5f;
+            float dy = cy - pitch * scale - DotDispSize * 0.5f; // Y inverted in screen space
+            GUI.DrawTexture(new Rect(dx, dy, DotDispSize, DotDispSize), dotTexture);
         }
 
-        private static string FormatRow(string label, string value) =>
-            $"<b>{label}</b>   {value}";
+        // --- Texture helpers ---
 
+        private static Texture2D MakeFillTexture(Color c)
+        {
+            var t = new Texture2D(1, 1);
+            t.SetPixel(0, 0, c);
+            t.Apply();
+            return t;
+        }
+
+        private static Texture2D MakeGimbalTexture(int size, int outerR, int innerR, Color col)
+        {
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            float cx = size * 0.5f;
+            float cy = size * 0.5f;
+
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float d = Mathf.Sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+                float ao = 1f - Mathf.Clamp01(Mathf.Abs(d - outerR) - 0.5f); // anti-aliased ring
+                float ai = 1f - Mathf.Clamp01(Mathf.Abs(d - innerR) - 0.5f);
+                float a  = Mathf.Max(ao, ai) * col.a;
+                pixels[y * size + x] = new Color(col.r, col.g, col.b, a);
+            }
+
+            t.SetPixels(pixels);
+            t.Apply();
+            return t;
+        }
+
+        private static Texture2D MakeDotTexture(int size, Color col)
+        {
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            float cx = size * 0.5f;
+            float cy = size * 0.5f;
+            float r  = size * 0.5f;
+
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float d = Mathf.Sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+                float a = (1f - Mathf.Clamp01(d - r + 1f)) * col.a;
+                pixels[y * size + x] = new Color(col.r, col.g, col.b, a);
+            }
+
+            t.SetPixels(pixels);
+            t.Apply();
+            return t;
+        }
+
+        private static string FormatRow(string label, string value) => $"{label}   {value}";
         private static string Sign(float v) => v >= 0f ? "+" : "-";
 
         void OnDestroy()
         {
-            if (bgTexture != null) Destroy(bgTexture);
+            if (bgTexture      != null) Destroy(bgTexture);
+            if (gimbalBgTexture != null) Destroy(gimbalBgTexture);
+            if (dotTexture      != null) Destroy(dotTexture);
         }
     }
 }
