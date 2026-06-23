@@ -70,7 +70,8 @@ namespace SimCore
             if (terrain != null)
                 groundY = terrain.SampleHeight(pos) + terrain.transform.position.y;
 
-            float altFt = (pos.y - groundY) * MToFeet;
+            float altAglFt = (pos.y - groundY) * MToFeet;
+            float altMslFt = pos.y * MToFeet;
 
             float vsMs  = Mathf.Abs(vel.y) > 0.05f ? vel.y : 0f; // suppress jitter when on ground
             float vsFpm = vsMs * MToFeet * 60f;
@@ -86,7 +87,7 @@ namespace SimCore
             float lineH    = fontSize + 10f;
             float textW    = 172f;
             float padding  = 12f;
-            float panelH   = Mathf.Max(lineH * 4 + 14f, GimbalDispSize + 14f);
+            float panelH   = Mathf.Max(lineH * 5 + 14f, GimbalDispSize + 14f);
             float panelW   = textW + GimbalDispSize + padding * 2f;
             float x = position.x;
             float y = position.y;
@@ -100,7 +101,8 @@ namespace SimCore
                 FormatRow("HDG", $"{heading:000}°"),
                 FormatRow("SPD", $"{Sign(airspeedKt)}{Mathf.Abs(airspeedKt):F0} kt"),
                 FormatRow("V/S", $"{Sign(vsFpm)}{Mathf.Abs(vsFpm):F0} fpm"),
-                FormatRow("ALT", $"{altFt:F0} ft"),
+                FormatRow("MSL", $"{altMslFt:F0} ft"),
+                FormatRow("AGL", $"{altAglFt:F0} ft"),
             };
             for (int i = 0; i < rows.Length; i++)
                 GUI.Label(new Rect(x + padding, textY + i * lineH, textW, lineH), rows[i], labelStyle);

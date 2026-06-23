@@ -13,7 +13,8 @@ namespace SimCore
         void LateUpdate()
         {
             if (target == null) return;
-            Vector3 desiredPos = target.position + target.TransformDirection(offset);
+            Quaternion yawOnly = Quaternion.Euler(0f, target.eulerAngles.y, 0f);
+            Vector3 desiredPos = target.position + yawOnly * offset;
             transform.position = Vector3.Lerp(transform.position, desiredPos, Time.deltaTime * followSpeed);
 
             Vector3 lookPoint = target.position + Vector3.up * 1.5f;

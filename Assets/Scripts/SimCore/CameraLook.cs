@@ -13,8 +13,10 @@ public class CameraLook : MonoBehaviour
     private int activeCameraIndex = 0;
 
     [Header("Audio")]
-    public AudioSource rotorAudio;
-    public AudioSource cockpitAudio;
+    [Tooltip("Played when Follow Camera (exterior) is active.")]
+    public AudioSource exteriorAudio;
+    [Tooltip("Played when Cockpit or Look Down (interior) is active.")]
+    public AudioSource interiorAudio;
 
     private float yaw = 0f;
     private float pitch = 10f;
@@ -126,8 +128,9 @@ public class CameraLook : MonoBehaviour
 
     void UpdateAudio()
     {
-        bool cockpitActive = activeCameraIndex != 0;
-        if (rotorAudio != null)   rotorAudio.mute   =  cockpitActive;
-        if (cockpitAudio != null) cockpitAudio.mute = !cockpitActive;
+        // cameras[1] = Follow Camera = exterior; all others (FPV, LookDown) = interior
+        bool exterior = activeCameraIndex == 1;
+        if (exteriorAudio != null) exteriorAudio.mute = !exterior;
+        if (interiorAudio != null) interiorAudio.mute =  exterior;
     }
 }

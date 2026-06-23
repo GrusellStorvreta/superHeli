@@ -2,7 +2,6 @@ using UnityEngine;
 
 namespace SimCore
 {
-    [RequireComponent(typeof(Rigidbody))]
     // Applies simulated physics state (position, rotation) to this GameObject's transform
     // and drives the rotor spin animation. All flight dynamics live in Simulator.cs.
     public class HelicopterPlayer : MonoBehaviour
@@ -28,8 +27,7 @@ namespace SimCore
 
             if (rotorTransform != null)
             {
-                float collective = Mathf.Clamp01((float)_driver.LastBufferedControl.collective);
-                float degPerSec  = collective * maxRotorRPM * 6f; // rpm → deg/s
+                float degPerSec  =  maxRotorRPM * 6f; // rpm → deg/s
                 rotorTransform.Rotate(Vector3.up, degPerSec * Time.deltaTime, Space.Self);
             }
         }
