@@ -70,6 +70,16 @@ namespace SimCore
 
         public void SetControlInput(ControlInput input) => SetControlInput(_defaultEntityId, input);
 
+        public void ResetActuators(string entityId)
+        {
+            if (string.IsNullOrEmpty(entityId)) entityId = _defaultEntityId;
+            if (_controls.TryGetValue(entityId, out var cs))
+            {
+                cs.target  = ControlInput.Zero;
+                cs.applied = ControlInput.Zero;
+            }
+        }
+
         public ControlInput GetAppliedControl(string entityId)
         {
             if (string.IsNullOrEmpty(entityId)) entityId = _defaultEntityId;

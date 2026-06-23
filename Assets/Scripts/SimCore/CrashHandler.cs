@@ -13,21 +13,17 @@ namespace SimCore
         public float niceLandingHold = 2.0f;
         public float niceLandingFade = 0.5f;
 
-        private SimulatorDriver driver;
         private GUIStyle crashStyle;
         private GUIStyle niceStyle;
         private Texture2D overlayTexture;
 
-        private float overlayAlpha    = 0f;
+        private float overlayAlpha     = 0f;
         private float niceLandingAlpha = 0f;
-        private bool  showCrashText   = false;
-        private bool  isCrashing      = false;
+        private bool  showCrashText    = false;
+        private bool  isCrashing       = false;
 
         void Start()
         {
-            driver = GetComponent<SimulatorDriver>();
-            if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
-
             var checker = GetComponent<LandingChecker>();
             if (checker != null)
                 checker.OnLanding += OnLanding;
@@ -55,6 +51,10 @@ namespace SimCore
             isCrashing    = true;
             showCrashText = true;
 
+            // Freeze physics so helicopter doesn't tumble during fade
+            var rb = GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = true;
+
             for (float t = 0f; t < fadeDuration; t += Time.deltaTime)
             {
                 overlayAlpha = t / fadeDuration;
@@ -64,6 +64,11 @@ namespace SimCore
 
             yield return new WaitForSeconds(holdDuration);
 
+            // Find driver fresh — avoids stale reference from Start()
+            var driver = GetComponent<SimulatorDriver>();
+            if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
+
+            if (rb != null) rb.isKinematic = false;
             driver?.ResetToSpawnPoint();
             showCrashText = false;
 
@@ -91,7 +96,6 @@ namespace SimCore
 
         void OnGUI()
         {
-            // Crash overlay
             if (overlayAlpha > 0f)
             {
                 Color prev = GUI.color;
@@ -109,7 +113,6 @@ namespace SimCore
                 }
             }
 
-            // Nice landing text
             if (niceLandingAlpha > 0f)
             {
                 if (niceStyle == null)

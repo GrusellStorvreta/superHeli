@@ -12,6 +12,10 @@ public class CameraLook : MonoBehaviour
     public Camera[] cameras;
     private int activeCameraIndex = 0;
 
+    [Header("Audio")]
+    public AudioSource rotorAudio;
+    public AudioSource cockpitAudio;
+
     private float yaw = 0f;
     private float pitch = 10f;
 
@@ -20,6 +24,7 @@ public class CameraLook : MonoBehaviour
         for (int i = 0; i < cameras.Length; i++)
             if (cameras[i] != null)
                 cameras[i].gameObject.SetActive(i == activeCameraIndex);
+        UpdateAudio();
     }
 
     void Update()
@@ -116,5 +121,13 @@ public class CameraLook : MonoBehaviour
         cameras[activeCameraIndex]?.gameObject.SetActive(false);
         activeCameraIndex = (activeCameraIndex + 1) % cameras.Length;
         cameras[activeCameraIndex]?.gameObject.SetActive(true);
+        UpdateAudio();
+    }
+
+    void UpdateAudio()
+    {
+        bool cockpitActive = activeCameraIndex != 0;
+        if (rotorAudio != null)   rotorAudio.mute   =  cockpitActive;
+        if (cockpitAudio != null) cockpitAudio.mute = !cockpitActive;
     }
 }

@@ -5,7 +5,6 @@ using UnityEngine.InputSystem;
 
 namespace SimCore
 {
-    [RequireComponent(typeof(Rigidbody))]
     public class SimulatorDriver : MonoBehaviour
     {
         [Tooltip("Entity id used with simulator.SetControlInput")]
@@ -23,9 +22,11 @@ namespace SimCore
         public float keyboardCollectiveRate = 0.5f;
         public float keyboardPedalRate = 1.0f;
 
+        [Tooltip("The Rigidbody to apply forces to. Defaults to this object's Rigidbody if unset.")]
+        public Rigidbody rb;
+
         private SimCore.Simulator simulator;
         private HeliInput heliInput;
-        private Rigidbody rb;
 
         private float sm_collective, sm_cyclic_x, sm_cyclic_y, sm_pedal;
         private float keyboardCollective = 0.5f;
@@ -40,10 +41,16 @@ namespace SimCore
         public Vector3 LastBodyVelocity => rb != null ? rb.velocity : Vector3.zero;
 
         private IWebSocketClient websocketClient = new NoopWebSocketClient();
+        private bool pendingReset = false;
 
         void Awake()
         {
-            rb = GetComponent<Rigidbody>();
+           
+            if (rb == null)
+            {
+                Debug.LogError("[SimulatorDriver] No Rigidbody found. Assign the 'Body' field in Inspector to the helicopter's Rigidbody.");
+                return;
+            }
             rb.mass = 1000f;
             rb.drag = 0f;
             rb.angularDrag = 0f;
@@ -161,22 +168,35 @@ namespace SimCore
 
         public void ResetToSpawnPoint()
         {
+            pendingReset = true;
+        }
+
+        private void ApplyReset()
+        {
             if (spawnPoint == null) return;
             rb.position        = spawnPoint.position;
             rb.rotation        = spawnPoint.rotation;
             rb.velocity        = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
-            sm_collective    = 0f;
-            sm_cyclic_x      = 0f;
-            sm_cyclic_y      = 0f;
-            sm_pedal         = 0f;
+            sm_collective      = 0f;
+            sm_cyclic_x        = 0f;
+            sm_cyclic_y        = 0f;
+            sm_pedal           = 0f;
             keyboardCollective = 0.5f;
             keyboardPedal      = 0f;
+            simulator?.ResetActuators(controlEntityId);
         }
 
         void FixedUpdate()
         {
             if (!Application.isPlaying || simulator == null || rb == null) return;
+
+            if (pendingReset)
+            {
+                pendingReset = false;
+                ApplyReset();
+                return;
+            }
 
             double dt = Time.fixedDeltaTime;
             simulator.UpdateActuators(controlEntityId, dt);

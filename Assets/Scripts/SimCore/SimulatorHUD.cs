@@ -8,7 +8,7 @@ namespace SimCore
         public int fontSize = 17;
         public bool show = true;
 
-        private SimulatorDriver driver;
+        public SimulatorDriver driver;
         private GUIStyle labelStyle;
         private GUIStyle boxStyle;
         private Texture2D bgTexture;
@@ -19,12 +19,12 @@ namespace SimCore
         private const float MToFeet   = 3.28084f;
         private const float MaxTilt   = 45f;
 
-        private const int   GimbalTexSize  = 90;
-        private const int   GimbalOuterR   = 40;
-        private const int   GimbalInnerR   = 16;
-        private const float GimbalDispSize = 90f;
-        private const int   DotTexSize     = 11;
-        private const float DotDispSize    = 11f;
+        private const int   GimbalTexSize  = 140;
+        private const int   GimbalOuterR   = 62;
+        private const int   GimbalInnerR   = 7;
+        private const float GimbalDispSize = 140f;
+        private const int   DotTexSize     = 9;
+        private const float DotDispSize    = 9f;
 
         void OnEnable() => BuildStyles();
 
@@ -64,8 +64,16 @@ namespace SimCore
             float heading    = rot.eulerAngles.y;
             float fwdSpeed   = Vector3.Dot(vel, rot * Vector3.forward);
             float airspeedKt = fwdSpeed * MsToKnots;
-            float vsFpm      = vel.y * MToFeet * 60f;
-            float altFt      = pos.y * MToFeet;
+
+            float groundY = 0f;
+            var terrain = Terrain.activeTerrain;
+            if (terrain != null)
+                groundY = terrain.SampleHeight(pos) + terrain.transform.position.y;
+
+            float altFt = (pos.y - groundY) * MToFeet;
+
+            float vsMs  = Mathf.Abs(vel.y) > 0.05f ? vel.y : 0f; // suppress jitter when on ground
+            float vsFpm = vsMs * MToFeet * 60f;
 
             // Attitude (normalize euler to -180..180)
             Vector3 euler = rot.eulerAngles;
@@ -127,14 +135,24 @@ namespace SimCore
             var pixels = new Color[size * size];
             float cx = size * 0.5f;
             float cy = size * 0.5f;
+            int midR = outerR / 2; // mid-range reference ring
 
             for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)
             {
                 float d = Mathf.Sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
-                float ao = 1f - Mathf.Clamp01(Mathf.Abs(d - outerR) - 0.5f); // anti-aliased ring
-                float ai = 1f - Mathf.Clamp01(Mathf.Abs(d - innerR) - 0.5f);
-                float a  = Mathf.Max(ao, ai) * col.a;
+                float ao  = 1f - Mathf.Clamp01(Mathf.Abs(d - outerR) - 0.5f);
+                float ai  = 1f - Mathf.Clamp01(Mathf.Abs(d - innerR) - 0.5f);
+                float amid = (1f - Mathf.Clamp01(Mathf.Abs(d - midR) - 0.5f)) * 0.4f;
+
+                // Crosshair: thin lines through center, fading outside outer ring
+                float distH = Mathf.Abs(y - cy);
+                float distV = Mathf.Abs(x - cx);
+                float crossH = (1f - Mathf.Clamp01(distH - 0.5f)) * Mathf.Clamp01(outerR - d) * 0.5f;
+                float crossV = (1f - Mathf.Clamp01(distV - 0.5f)) * Mathf.Clamp01(outerR - d) * 0.5f;
+                float cross  = Mathf.Max(crossH, crossV);
+
+                float a = Mathf.Max(Mathf.Max(ao, ai), Mathf.Max(amid, cross)) * col.a;
                 pixels[y * size + x] = new Color(col.r, col.g, col.b, a);
             }
 
