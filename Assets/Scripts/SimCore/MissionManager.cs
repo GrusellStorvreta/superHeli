@@ -7,23 +7,27 @@ namespace SimCore
     {
         public SimulatorDriver driver;
 
+        [Header("Level")]
+        public int              levelNumber        = 1;
+        public CheckpointRing[] level2Checkpoints;   // assign Ring1, Ring2 in Inspector
+
         public enum Phase { Idle, Running, Success, Failed }
-        public Phase    CurrentPhase    { get; private set; } = Phase.Idle;
-        public float    TimeRemaining   { get; private set; }
-        public float    HoverProgress   { get; private set; }
-        public bool     HoverInZone     { get; private set; }
-        public bool     IsHoverTask     { get; private set; }
+        public Phase    CurrentPhase       { get; private set; } = Phase.Idle;
+        public float    TimeRemaining      { get; private set; }
+        public float    HoverProgress      { get; private set; }
+        public bool     HoverInZone        { get; private set; }
+        public bool     IsHoverTask        { get; private set; }
         public string   CurrentInstruction { get; private set; } = "";
-        public float    FinalTime       { get; private set; }
+        public float    FinalTime          { get; private set; }
 
         private const float MToFt = 3.28084f;
 
-        // --- Task / Level data ---
+        // --- Level data ---
 
         struct LevelEnvironment
         {
-            public float windSpeed;           // m/s — written to WindZone.windMain
-            public float windDirectionDeg;    // 0 = world +Z (Unity forward)
+            public float windSpeed;
+            public float windDirectionDeg;
             public float windTurbulence;
             public float windPulseMagnitude;
             public float windPulseFrequency;
@@ -31,12 +35,13 @@ namespace SimCore
 
         class TaskDef
         {
-            public enum Kind { ClimbToAGL, HoverAtAGL, Land }
-            public Kind   kind;
-            public float  targetAglFt;
-            public float  hoverDuration;
-            public float  maxDeviationFt;
-            public string instruction;
+            public enum Kind { ClimbToAGL, HoverAtAGL, FlyThrough, Land }
+            public Kind           kind;
+            public float          targetAglFt;
+            public float          hoverDuration;
+            public float          maxDeviationFt;
+            public CheckpointRing checkpoint;
+            public string         instruction;
         }
 
         private TaskDef[] tasks;
@@ -49,66 +54,90 @@ namespace SimCore
         private float   hoverTimer;
         private Vector3 hoverAnchor;
         private bool    landingReceived;
+        private bool    _checkpointPassed;
         private LandingChecker landingChecker;
 
         // -------------------------------------------------------
 
         void Start()
         {
-            BuildLevel1();
+            BuildLevel();
             if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
             landingChecker = FindObjectOfType<LandingChecker>();
             if (landingChecker != null) landingChecker.OnLanding += OnLanding;
             StartMission();
         }
 
+        void BuildLevel()
+        {
+            if (levelNumber == 2) BuildLevel2();
+            else                  BuildLevel1();
+        }
+
         void BuildLevel1()
         {
-            _environment = new LevelEnvironment
+            _environment = new LevelEnvironment { windSpeed = 0f };
+            timeLimit    = 30f;
+            tasks        = new TaskDef[]
             {
-                windSpeed          = 0f,
-                windDirectionDeg   = 0f,
-                windTurbulence     = 0f,
-                windPulseMagnitude = 0f,
-                windPulseFrequency = 0f,
+                new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 100f,
+                              instruction = "Climb to 100 ft AGL" },
+                new TaskDef { kind = TaskDef.Kind.HoverAtAGL, targetAglFt = 100f,
+                              hoverDuration = 5f, maxDeviationFt = 3f,
+                              instruction   = "Hover at 100 ft  (±3 ft)  for 5 sec" },
+                new TaskDef { kind = TaskDef.Kind.Land,
+                              instruction = "Land the helicopter" },
             };
+        }
 
-            timeLimit = 30f;
+        void BuildLevel2()
+        {
+            _environment = new LevelEnvironment { windSpeed = 0f };
+            timeLimit    = 120f;
+
+            var ring1 = level2Checkpoints != null && level2Checkpoints.Length > 0 ? level2Checkpoints[0] : null;
+            var ring2 = level2Checkpoints != null && level2Checkpoints.Length > 1 ? level2Checkpoints[1] : null;
+
             tasks = new TaskDef[]
             {
-                new TaskDef
-                {
-                    kind        = TaskDef.Kind.ClimbToAGL,
-                    targetAglFt = 100f,
-                    instruction = "Climb to 100 ft AGL"
-                },
-                new TaskDef
-                {
-                    kind           = TaskDef.Kind.HoverAtAGL,
-                    targetAglFt    = 100f,
-                    hoverDuration  = 5f,
-                    maxDeviationFt = 3f,
-                    instruction    = "Hover at 100 ft  (±3 ft)  for 5 sec"
-                },
-                new TaskDef
-                {
-                    kind        = TaskDef.Kind.Land,
-                    instruction = "Land the helicopter"
-                },
+                new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 200f,
+                              instruction = "Climb to 200 ft AGL" },
+                new TaskDef { kind = TaskDef.Kind.HoverAtAGL, targetAglFt = 200f,
+                              hoverDuration = 3f, maxDeviationFt = 5f,
+                              instruction   = "Hover at 200 ft  (±5 ft)  for 3 sec" },
+                new TaskDef { kind = TaskDef.Kind.FlyThrough, checkpoint = ring1,
+                              instruction = "Fly through Checkpoint 1" },
+                new TaskDef { kind = TaskDef.Kind.HoverAtAGL, targetAglFt = 200f,
+                              hoverDuration = 3f, maxDeviationFt = 5f,
+                              instruction   = "Hover at 200 ft  (±5 ft)  for 3 sec" },
+                new TaskDef { kind = TaskDef.Kind.FlyThrough, checkpoint = ring2,
+                              instruction = "Fly through Checkpoint 2  (turn around!)" },
+                new TaskDef { kind = TaskDef.Kind.HoverAtAGL, targetAglFt = 200f,
+                              hoverDuration = 3f, maxDeviationFt = 5f,
+                              instruction   = "Hover at 200 ft  (±5 ft)  for 3 sec" },
+                new TaskDef { kind = TaskDef.Kind.Land,
+                              instruction = "Land the helicopter" },
             };
         }
 
         void StartMission()
         {
             ApplyEnvironment(_environment);
-            taskIdx         = 0;
-            TimeRemaining   = timeLimit;
-            hoverTimer      = 0f;
-            HoverProgress   = 0f;
-            HoverInZone     = false;
-            IsHoverTask     = false;
-            landingReceived = false;
-            CurrentPhase    = Phase.Running;
+
+            // Hide all checkpoints — shown one at a time as tasks advance
+            if (level2Checkpoints != null)
+                foreach (var r in level2Checkpoints)
+                    if (r != null) r.gameObject.SetActive(false);
+
+            taskIdx           = 0;
+            TimeRemaining     = timeLimit;
+            hoverTimer        = 0f;
+            HoverProgress     = 0f;
+            HoverInZone       = false;
+            IsHoverTask       = false;
+            landingReceived   = false;
+            _checkpointPassed = false;
+            CurrentPhase      = Phase.Running;
             RefreshInstruction();
         }
 
@@ -163,6 +192,11 @@ namespace SimCore
                     }
                     break;
 
+                case TaskDef.Kind.FlyThrough:
+                    if (_checkpointPassed)
+                        AdvanceTask(pos);
+                    break;
+
                 case TaskDef.Kind.Land:
                     if (landingReceived)
                         Succeed();
@@ -172,11 +206,26 @@ namespace SimCore
 
         void AdvanceTask(Vector3 pos)
         {
+            // Unsubscribe from outgoing checkpoint
+            var prev = tasks[taskIdx];
+            if (prev.kind == TaskDef.Kind.FlyThrough && prev.checkpoint != null)
+                prev.checkpoint.OnPassedThrough -= OnCheckpointPassed;
+
             taskIdx++;
             if (taskIdx >= tasks.Length) { Succeed(); return; }
 
-            if (tasks[taskIdx].kind == TaskDef.Kind.HoverAtAGL)
+            var next = tasks[taskIdx];
+
+            if (next.kind == TaskDef.Kind.HoverAtAGL)
                 hoverAnchor = pos;
+
+            if (next.kind == TaskDef.Kind.FlyThrough && next.checkpoint != null)
+            {
+                next.checkpoint.gameObject.SetActive(true);
+                next.checkpoint.ResetRing();
+                _checkpointPassed = false;
+                next.checkpoint.OnPassedThrough += OnCheckpointPassed;
+            }
 
             hoverTimer      = 0f;
             HoverProgress   = 0f;
@@ -184,19 +233,26 @@ namespace SimCore
             RefreshInstruction();
         }
 
+        void OnCheckpointPassed() => _checkpointPassed = true;
+
         void OnLanding(LandingResult result)
         {
             if (CurrentPhase != Phase.Running) return;
 
             if (!result.success)
             {
-                // Crash — restart task sequence, timer keeps running
-                taskIdx         = 0;
-                hoverTimer      = 0f;
-                HoverProgress   = 0f;
-                HoverInZone     = false;
-                IsHoverTask     = false;
-                landingReceived = false;
+                // Crash — unsubscribe any active checkpoint, restart tasks
+                UnsubscribeCurrentCheckpoint();
+                taskIdx           = 0;
+                hoverTimer        = 0f;
+                HoverProgress     = 0f;
+                HoverInZone       = false;
+                IsHoverTask       = false;
+                landingReceived   = false;
+                _checkpointPassed = false;
+                if (level2Checkpoints != null)
+                    foreach (var r in level2Checkpoints)
+                        if (r != null) r.gameObject.SetActive(false);
                 RefreshInstruction();
                 return;
             }
@@ -211,6 +267,12 @@ namespace SimCore
             CurrentPhase = Phase.Success;
             IsHoverTask  = false;
             RefreshInstruction();
+
+            // Unlock next level
+            if (GameSettings.CurrentLevel >= GameSettings.UnlockedLevels)
+                GameSettings.UnlockedLevels = GameSettings.CurrentLevel + 1;
+
+            StartCoroutine(ReturnToMenuAfterDelay(4f));
         }
 
         void Fail()
@@ -221,13 +283,32 @@ namespace SimCore
             StartCoroutine(RestartAfterDelay(3f));
         }
 
+        IEnumerator ReturnToMenuAfterDelay(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            CurrentPhase = Phase.Idle;
+            var drv = driver != null ? driver : FindObjectOfType<SimulatorDriver>();
+            drv?.ResetToSpawnPoint();
+            FindObjectOfType<MainMenuManager>()?.ShowMenu();
+        }
+
         IEnumerator RestartAfterDelay(float delay)
         {
             yield return new WaitForSeconds(delay);
-            var driver = this.driver != null ? this.driver : FindObjectOfType<SimulatorDriver>();
-            driver?.ResetToSpawnPoint();
-            BuildLevel1();
+            var drv = driver != null ? driver : FindObjectOfType<SimulatorDriver>();
+            drv?.ResetToSpawnPoint();
+            BuildLevel();
             StartMission();
+        }
+
+        void UnsubscribeCurrentCheckpoint()
+        {
+            if (tasks == null || taskIdx >= tasks.Length) return;
+            {
+                var t = tasks[taskIdx];
+                if (t.kind == TaskDef.Kind.FlyThrough && t.checkpoint != null)
+                    t.checkpoint.OnPassedThrough -= OnCheckpointPassed;
+            }
         }
 
         void RefreshInstruction()
@@ -241,16 +322,12 @@ namespace SimCore
         {
             var wz = FindObjectOfType<WindZone>();
             if (wz == null) return;
-
             wz.windMain           = env.windSpeed;
             wz.windTurbulence     = env.windTurbulence;
             wz.windPulseMagnitude = env.windPulseMagnitude;
             wz.windPulseFrequency = env.windPulseFrequency;
             wz.transform.rotation = Quaternion.Euler(0f, env.windDirectionDeg, 0f);
-
-            // Refresh the cached WindZone reference in WindForce if present.
-            var windForce = FindObjectOfType<WindForce>();
-            windForce?.RefreshWindZone();
+            FindObjectOfType<WindForce>()?.RefreshWindZone();
         }
 
         float GetAGL(Vector3 pos)
@@ -264,6 +341,7 @@ namespace SimCore
 
         void OnDestroy()
         {
+            UnsubscribeCurrentCheckpoint();
             if (landingChecker != null)
                 landingChecker.OnLanding -= OnLanding;
         }
