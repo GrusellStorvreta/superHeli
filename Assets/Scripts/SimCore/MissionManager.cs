@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace SimCore
 {
@@ -11,6 +12,12 @@ namespace SimCore
         public int              levelNumber        = 1;
         public CheckpointRing[] level2Checkpoints;   // assign Ring1, Ring2 in Inspector
 
+        [Header("Level 7")]
+        public string      returnSceneName      = "";
+        public Transform   rescueZoneTransform;
+        public Transform   baseTransform;
+        public RescueNPC[] rescueNPCs;
+
         public enum Phase { Idle, Running, Success, Failed }
         public Phase    CurrentPhase       { get; private set; } = Phase.Idle;
         public float    TimeRemaining      { get; private set; }
@@ -19,6 +26,7 @@ namespace SimCore
         public bool     IsHoverTask        { get; private set; }
         public string   CurrentInstruction { get; private set; } = "";
         public float    FinalTime          { get; private set; }
+        public Vector3? NavigationTarget   { get; private set; }
 
         private const float MToFt = 3.28084f;
 
@@ -35,13 +43,15 @@ namespace SimCore
 
         class TaskDef
         {
-            public enum Kind { ClimbToAGL, HoverAtAGL, FlyThrough, Land }
+            public enum Kind { ClimbToAGL, HoverAtAGL, FlyThrough, Land, NavigateTo, PickupNPCs }
             public Kind           kind;
             public float          targetAglFt;
             public float          hoverDuration;
             public float          maxDeviationFt;
             public CheckpointRing checkpoint;
             public string         instruction;
+            public float          radiusM;
+            public Transform      targetTransform;
         }
 
         private TaskDef[] tasks;
@@ -70,8 +80,9 @@ namespace SimCore
 
         void BuildLevel()
         {
-            if (levelNumber == 2) BuildLevel2();
-            else                  BuildLevel1();
+            if      (levelNumber == 2) BuildLevel2();
+            else if (levelNumber == 7) BuildLevel7();
+            else                       BuildLevel1();
         }
 
         void BuildLevel1()
@@ -120,6 +131,32 @@ namespace SimCore
             };
         }
 
+        void BuildLevel7()
+        {
+            _environment = new LevelEnvironment
+            {
+                windSpeed          = 4f,
+                windDirectionDeg   = 210f,
+                windTurbulence     = 0.4f,
+                windPulseMagnitude = 0.2f,
+                windPulseFrequency = 0.5f,
+            };
+            timeLimit = 120f;
+            tasks = new TaskDef[]
+            {
+                new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 50f,
+                              instruction = "Climb to 50 ft AGL" },
+                new TaskDef { kind = TaskDef.Kind.NavigateTo, targetTransform = rescueZoneTransform,
+                              radiusM = 100f, instruction = "Fly to rescue zone" },
+                new TaskDef { kind = TaskDef.Kind.PickupNPCs,
+                              instruction = "Land and pick up survivors" },
+                new TaskDef { kind = TaskDef.Kind.NavigateTo, targetTransform = baseTransform,
+                              radiusM = 80f, instruction = "Return to base" },
+                new TaskDef { kind = TaskDef.Kind.Land,
+                              instruction = "Land the helicopter" },
+            };
+        }
+
         void StartMission()
         {
             ApplyEnvironment(_environment);
@@ -139,6 +176,7 @@ namespace SimCore
             _checkpointPassed = false;
             CurrentPhase      = Phase.Running;
             RefreshInstruction();
+            UpdateNavigationTarget();
         }
 
         void Update()
@@ -201,7 +239,26 @@ namespace SimCore
                     if (landingReceived)
                         Succeed();
                     break;
+
+                case TaskDef.Kind.NavigateTo:
+                    if (t.targetTransform != null)
+                    {
+                        float dist = Vector3.Distance(pos, t.targetTransform.position);
+                        if (dist <= t.radiusM) AdvanceTask(pos);
+                    }
+                    break;
+
+                case TaskDef.Kind.PickupNPCs:
+                    if (rescueNPCs != null && AllBoarded()) AdvanceTask(pos);
+                    break;
             }
+        }
+
+        bool AllBoarded()
+        {
+            foreach (var npc in rescueNPCs)
+                if (npc == null || !npc.IsBoarded) return false;
+            return true;
         }
 
         void AdvanceTask(Vector3 pos)
@@ -231,6 +288,16 @@ namespace SimCore
             HoverProgress   = 0f;
             landingReceived = false;
             RefreshInstruction();
+            UpdateNavigationTarget();
+        }
+
+        void UpdateNavigationTarget()
+        {
+            if (taskIdx >= tasks.Length) { NavigationTarget = null; return; }
+            var t = tasks[taskIdx];
+            NavigationTarget = (t.kind == TaskDef.Kind.NavigateTo && t.targetTransform != null)
+                ? (Vector3?)t.targetTransform.position
+                : null;
         }
 
         void OnCheckpointPassed() => _checkpointPassed = true;
@@ -253,7 +320,11 @@ namespace SimCore
                 if (level2Checkpoints != null)
                     foreach (var r in level2Checkpoints)
                         if (r != null) r.gameObject.SetActive(false);
+                if (rescueNPCs != null)
+                    foreach (var npc in rescueNPCs)
+                        if (npc != null) npc.Unboard();
                 RefreshInstruction();
+                UpdateNavigationTarget();
                 return;
             }
 
@@ -269,7 +340,11 @@ namespace SimCore
             RefreshInstruction();
 
             // Unlock next level
-            if (GameSettings.CurrentLevel >= GameSettings.UnlockedLevels)
+            if (levelNumber == 2)
+                GameSettings.UnlockedLevels = Mathf.Max(GameSettings.UnlockedLevels, 7);
+            else if (levelNumber == 7)
+                GameSettings.UnlockedLevels = Mathf.Max(GameSettings.UnlockedLevels, 8);
+            else if (GameSettings.CurrentLevel >= GameSettings.UnlockedLevels)
                 GameSettings.UnlockedLevels = GameSettings.CurrentLevel + 1;
 
             StartCoroutine(ReturnToMenuAfterDelay(4f));
@@ -289,7 +364,10 @@ namespace SimCore
             CurrentPhase = Phase.Idle;
             var drv = driver != null ? driver : FindObjectOfType<SimulatorDriver>();
             drv?.ResetToSpawnPoint();
-            FindObjectOfType<MainMenuManager>()?.ShowMenu();
+            if (!string.IsNullOrEmpty(returnSceneName))
+                SceneManager.LoadScene(returnSceneName);
+            else
+                FindObjectOfType<MainMenuManager>()?.ShowMenu();
         }
 
         IEnumerator RestartAfterDelay(float delay)

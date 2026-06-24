@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace SimCore
 {
@@ -75,6 +76,13 @@ namespace SimCore
         {
             GameSettings.CurrentMode  = mode;
             GameSettings.CurrentLevel = level;
+
+            if (level == 7)
+            {
+                SceneManager.LoadScene("Level7");
+                return;
+            }
+
             _inMenu = false;
 
             if (menuCamera != null) menuCamera.gameObject.SetActive(false);
@@ -162,7 +170,7 @@ namespace SimCore
             GUI.DrawTexture(new Rect(0, 0, sw, sh), _overlayTex);
 
             float panelW = 360f;
-            float panelH = _menuPhase == MenuPhase.Main ? 300f : 340f;
+            float panelH = _menuPhase == MenuPhase.Main ? 300f : 420f;
             float px     = (sw - panelW) * 0.5f;
             float py     = (sh - panelH) * 0.5f;
 
@@ -205,7 +213,15 @@ namespace SimCore
                 if (level2Unlocked) StartGame(GameSettings.Mode.Mission, 2);
             }
 
-            if (GUI.Button(new Rect(bx, py + 296f, btnW, 36f), "← BACK", _backStyle))
+            bool level7Unlocked = unlocked >= 7;
+            string level7Label  = level7Unlocked ? "LEVEL 7" : "LEVEL 7  \U0001F512";
+            if (GUI.Button(new Rect(bx, py + 296f, btnW, btnH), level7Label,
+                           level7Unlocked ? _buttonStyle : _buttonLockedStyle))
+            {
+                if (level7Unlocked) StartGame(GameSettings.Mode.Mission, 7);
+            }
+
+            if (GUI.Button(new Rect(bx, py + 374f, btnW, 36f), "← BACK", _backStyle))
                 _menuPhase = MenuPhase.Main;
         }
 

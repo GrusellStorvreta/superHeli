@@ -25,6 +25,8 @@ namespace SimCore
         [Tooltip("The Rigidbody to apply forces to. Defaults to this object's Rigidbody if unset.")]
         public Rigidbody rb;
 
+        public float baseMass = 1000f;
+
         private SimCore.Simulator simulator;
         private HeliInput heliInput;
 
@@ -51,7 +53,7 @@ namespace SimCore
                 Debug.LogError("[SimulatorDriver] No Rigidbody found. Assign the 'Body' field in Inspector to the helicopter's Rigidbody.");
                 return;
             }
-            rb.mass = 1000f;
+            rb.mass = baseMass;
             rb.drag = 0f;
             rb.angularDrag = 0f;
             rb.useGravity = true;
@@ -171,6 +173,9 @@ namespace SimCore
             pendingReset = true;
         }
 
+        public void AddPassengerMass(float kg)  => rb.mass += kg;
+        public void ResetPassengerMass()        => rb.mass = baseMass;
+
         private void ApplyReset()
         {
             if (spawnPoint == null) return;
@@ -178,6 +183,7 @@ namespace SimCore
             rb.rotation        = spawnPoint.rotation;
             rb.velocity        = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+            rb.mass            = baseMass;
             sm_collective      = 0f;
             sm_cyclic_x        = 0f;
             sm_cyclic_y        = 0f;
