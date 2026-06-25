@@ -42,7 +42,7 @@ namespace SimCore
         private static readonly Color DarkPanel = new Color(0.03f, 0.05f, 0.09f, 0.92f);
         private static readonly Color Grey      = new Color(0.4f, 0.4f, 0.4f, 0.9f);
 
-        private int ButtonCount => _menuPhase == MenuPhase.Main ? 3
+        private int ButtonCount => _menuPhase == MenuPhase.Main ? 4
                                  : _menuPhase == MenuPhase.Settings ? 2
                                  : 4;
 
@@ -94,6 +94,7 @@ namespace SimCore
                 if (_selectedIndex == 0) StartGame(GameSettings.Mode.FreeFlight);
                 if (_selectedIndex == 1) { _menuPhase = MenuPhase.LevelSelect; _selectedIndex = 0; }
                 if (_selectedIndex == 2) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
+                if (_selectedIndex == 3) Application.Quit();
             }
             else if (_menuPhase == MenuPhase.LevelSelect)
             {
@@ -236,7 +237,7 @@ namespace SimCore
             GUI.DrawTexture(new Rect(0, 0, sw, sh), _overlayTex);
 
             float panelW = 360f;
-            float panelH = _menuPhase == MenuPhase.Main ? 370f
+            float panelH = _menuPhase == MenuPhase.Main ? 450f
                          : _menuPhase == MenuPhase.Settings ? 370f
                          : 420f;
             float px     = (sw - panelW) * 0.5f;
@@ -269,6 +270,9 @@ namespace SimCore
 
             if (GUI.Button(new Rect(bx, py + 296f, btnW, btnH), "SETTINGS", StyleFor(2)))
                 { _menuPhase = MenuPhase.Settings; _selectedIndex = 0; }
+
+            if (GUI.Button(new Rect(bx, py + 370f, btnW, btnH), "QUIT", StyleFor(3)))
+                Application.Quit();
         }
 
         void DrawSettings(float bx, float py, float btnW, float btnH)
