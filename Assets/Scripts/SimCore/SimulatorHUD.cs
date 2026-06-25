@@ -70,7 +70,7 @@ namespace SimCore
             if (terrain != null)
                 groundY = terrain.SampleHeight(pos) + terrain.transform.position.y;
 
-            float altAglFt = (pos.y - groundY) * MToFeet;
+            float altAglFt = Mathf.Max(0f, (pos.y - groundY) * MToFeet);
             float altMslFt = pos.y * MToFeet;
 
             float vsMs  = Mathf.Abs(vel.y) > 0.05f ? vel.y : 0f; // suppress jitter when on ground

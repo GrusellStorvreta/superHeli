@@ -414,7 +414,7 @@ namespace SimCore
             float groundY = terrain != null
                 ? terrain.SampleHeight(pos) + terrain.transform.position.y
                 : 0f;
-            return (pos.y - groundY) * MToFt;
+            return Mathf.Max(0f, (pos.y - groundY) * MToFt);
         }
 
         void OnDestroy()
