@@ -8,7 +8,7 @@ namespace SimCore
 
         public static int UnlockedLevels
         {
-            get => UnityEngine.PlayerPrefs.GetInt("UnlockedLevels", 1);
+            get => UnityEngine.Mathf.Max(UnityEngine.PlayerPrefs.GetInt("UnlockedLevels", 1), 7);
             set { UnityEngine.PlayerPrefs.SetInt("UnlockedLevels", value); UnityEngine.PlayerPrefs.Save(); }
         }
 

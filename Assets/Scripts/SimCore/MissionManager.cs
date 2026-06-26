@@ -13,10 +13,12 @@ namespace SimCore
         public CheckpointRing[] level2Checkpoints;   // assign Ring1, Ring2 in Inspector
 
         [Header("Level 7")]
-        public string      returnSceneName      = "";
-        public Transform   rescueZoneTransform;
-        public Transform   baseTransform;
-        public RescueNPC[] rescueNPCs;
+        public string                returnSceneName     = "";
+        public Transform             rescueZoneTransform;
+        public Transform             baseTransform;
+        public RescueNPC[]           rescueNPCs;
+        public GameObject            level7NPCParent;
+        public Level7NPCController   level7NPCs;
 
         public enum Phase { Idle, Running, Success, Failed }
         public Phase    CurrentPhase       { get; private set; } = Phase.Idle;
@@ -71,10 +73,23 @@ namespace SimCore
 
         void Start()
         {
-            BuildLevel();
             if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
             landingChecker = FindObjectOfType<LandingChecker>();
             if (landingChecker != null) landingChecker.OnLanding += OnLanding;
+            BuildLevel();
+            StartMission();
+        }
+
+        public void Initialize(int level)
+        {
+            levelNumber = level;
+            if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
+            if (landingChecker == null)
+            {
+                landingChecker = FindObjectOfType<LandingChecker>();
+                if (landingChecker != null) landingChecker.OnLanding += OnLanding;
+            }
+            BuildLevel();
             StartMission();
         }
 
@@ -249,7 +264,8 @@ namespace SimCore
                     break;
 
                 case TaskDef.Kind.PickupNPCs:
-                    if (rescueNPCs != null && AllBoarded()) AdvanceTask(pos);
+                    if (level7NPCs != null && level7NPCs.IsComplete) Succeed();
+                    else if (rescueNPCs != null && AllBoarded()) AdvanceTask(pos);
                     break;
             }
         }
@@ -283,6 +299,9 @@ namespace SimCore
                 _checkpointPassed = false;
                 next.checkpoint.OnPassedThrough += OnCheckpointPassed;
             }
+
+            if (next.kind == TaskDef.Kind.PickupNPCs && level7NPCParent != null)
+                level7NPCParent.SetActive(true);
 
             hoverTimer      = 0f;
             HoverProgress   = 0f;

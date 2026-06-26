@@ -149,12 +149,6 @@ namespace SimCore
             GameSettings.CurrentMode  = mode;
             GameSettings.CurrentLevel = level;
 
-            if (level == 7)
-            {
-                SceneManager.LoadScene("Level7");
-                return;
-            }
-
             _inMenu = false;
 
             if (menuCamera != null) menuCamera.gameObject.SetActive(false);
@@ -176,8 +170,8 @@ namespace SimCore
             {
                 if (missionManager != null)
                 {
-                    missionManager.levelNumber = level;
-                    missionManager.enabled     = true;
+                    missionManager.enabled = true;
+                    missionManager.Initialize(level);
                 }
                 if (missionHUD != null) missionHUD.enabled = true;
             }

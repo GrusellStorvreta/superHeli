@@ -22,8 +22,6 @@ namespace SimCore
         private static readonly Color Red      = new Color(0.95f, 0.25f, 0.2f);
         private static readonly Color Panel    = new Color(0.04f, 0.06f, 0.1f, 0.84f);
 
-        void OnEnable() => BuildStyles();
-
         void BuildStyles()
         {
             panelTex    = MakeTex(Panel);
