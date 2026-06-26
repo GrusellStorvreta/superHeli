@@ -7,7 +7,9 @@ namespace SimCore
     public class HelicopterPlayer : MonoBehaviour
     {
         public Transform rotorTransform;
-        public float maxRotorRPM = 600f;
+        public Transform tailRotorTransform;
+        public float maxRotorRPM     = 600f;
+        public float tailRotorRPM    = 2400f;
 
         private SimulatorDriver _driver;
 
@@ -27,8 +29,14 @@ namespace SimCore
 
             if (rotorTransform != null)
             {
-                float degPerSec  =  maxRotorRPM * 6f; // rpm → deg/s
+                float degPerSec = maxRotorRPM * 6f;
                 rotorTransform.Rotate(Vector3.up, degPerSec * Time.deltaTime, Space.Self);
+            }
+
+            if (tailRotorTransform != null)
+            {
+                float degPerSec = tailRotorRPM * 6f;
+                tailRotorTransform.Rotate(Vector3.right, degPerSec * Time.deltaTime, Space.Self);
             }
         }
     }

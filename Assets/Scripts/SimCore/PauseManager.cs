@@ -71,13 +71,22 @@ namespace SimCore
 
             if (!_paused) return;
 
-            if (gp != null)
-            {
-                if (gp.dpad.down.wasPressedThisFrame) _selectedIndex = (_selectedIndex + 1) % 2;
-                if (gp.dpad.up.wasPressedThisFrame)   _selectedIndex = (_selectedIndex - 1 + 2) % 2;
-                if (gp.buttonSouth.wasPressedThisFrame) ConfirmSelected();
-                if (gp.buttonEast.wasPressedThisFrame)  Resume();
-            }
+            bool navDown = (kb != null && (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame))
+                        || (gp != null && gp.dpad.down.wasPressedThisFrame);
+
+            bool navUp = (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame))
+                      || (gp != null && gp.dpad.up.wasPressedThisFrame);
+
+            bool confirm = (kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
+                        || (gp != null && gp.buttonSouth.wasPressedThisFrame);
+
+            bool back = (kb != null && kb.escapeKey.wasPressedThisFrame)
+                     || (gp != null && gp.buttonEast.wasPressedThisFrame);
+
+            if (navDown) _selectedIndex = (_selectedIndex + 1) % 2;
+            if (navUp)   _selectedIndex = (_selectedIndex - 1 + 2) % 2;
+            if (confirm) ConfirmSelected();
+            if (back)    Resume();
         }
 
         void Pause()

@@ -4,6 +4,9 @@ namespace SimCore
 {
     public class NavigationHUD : MonoBehaviour
     {
+        [Header("Navigation")]
+        public Transform homeBase;
+
         private MissionManager mission;
         private SimulatorDriver driver;
         private GUIStyle        labelStyle;
@@ -33,13 +36,16 @@ namespace SimCore
         {
             if (mission == null) mission = FindObjectOfType<MissionManager>();
             if (driver  == null) driver  = FindObjectOfType<SimulatorDriver>();
-            if (mission == null || driver == null) return;
-            if (mission.NavigationTarget == null) return;
+            if (driver == null) return;
             if (labelStyle == null || bgTex == null) BuildStyles();
+
+            Vector3? navTarget = mission?.NavigationTarget
+                              ?? (homeBase != null ? homeBase.position : (Vector3?)null);
+            if (navTarget == null) return;
 
             Vector3 heliPos = driver.LastBodyPosition;
             float   heliHdg = driver.LastBodyRotation.eulerAngles.y;
-            Vector3 target  = mission.NavigationTarget.Value;
+            Vector3 target  = navTarget.Value;
 
             Vector3 toTarget = target - heliPos;
             float   distM    = toTarget.magnitude;
@@ -66,7 +72,7 @@ namespace SimCore
             float ax    = px + panW - 44f;
             float ay    = py + (panH - 32f) * 0.5f;
             var   pivot = new Vector2(ax + 16f, ay + 16f);
-            GUIUtility.RotateAroundPivot(relBrg, pivot);
+            GUIUtility.RotateAroundPivot(180f - relBrg, pivot);
             GUI.DrawTexture(new Rect(ax, ay, 32f, 32f), arrowTex);
             GUI.matrix = Matrix4x4.identity;
         }
