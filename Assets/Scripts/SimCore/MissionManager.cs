@@ -427,14 +427,8 @@ namespace SimCore
             FindObjectOfType<WindForce>()?.RefreshWindZone();
         }
 
-        float GetAGL(Vector3 pos)
-        {
-            var terrain = Terrain.activeTerrain;
-            float groundY = terrain != null
-                ? terrain.SampleHeight(pos) + terrain.transform.position.y
-                : 0f;
-            return Mathf.Max(0f, (pos.y - groundY) * MToFt);
-        }
+        float GetAGL(Vector3 pos) =>
+            Mathf.Max(0f, (pos.y - TerrainUtils.GetGroundY(pos)) * MToFt);
 
         void OnDestroy()
         {

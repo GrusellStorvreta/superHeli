@@ -65,11 +65,7 @@ namespace SimCore
             float fwdSpeed   = Vector3.Dot(vel, rot * Vector3.forward);
             float airspeedKt = fwdSpeed * MsToKnots;
 
-            float groundY = 0f;
-            var terrain = Terrain.activeTerrain;
-            if (terrain != null)
-                groundY = terrain.SampleHeight(pos) + terrain.transform.position.y;
-
+            float groundY  = TerrainUtils.GetGroundY(pos);
             float altAglFt = Mathf.Max(0f, (pos.y - groundY) * MToFeet);
             float altMslFt = pos.y * MToFeet;
 

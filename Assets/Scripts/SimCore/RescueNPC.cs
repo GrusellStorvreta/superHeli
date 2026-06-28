@@ -34,11 +34,7 @@ namespace SimCore
 
             Vector3 heliPos = _driver.LastBodyPosition;
 
-            float groundY = 0f;
-            var terrain = Terrain.activeTerrain;
-            if (terrain != null)
-                groundY = terrain.SampleHeight(heliPos) + terrain.transform.position.y;
-            float aglFt = (heliPos.y - groundY) * MToFt;
+            float aglFt = (heliPos.y - TerrainUtils.GetGroundY(heliPos)) * MToFt;
 
             if (aglFt > AglBoardThreshFt) return;
 
