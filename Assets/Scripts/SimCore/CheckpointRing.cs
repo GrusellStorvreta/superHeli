@@ -45,7 +45,7 @@ namespace SimCore
             for (int i = 0; i < segments; i++)
             {
                 float a = i / (float)segments * Mathf.PI * 2f;
-                _line.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius));
+                _line.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, Mathf.Sin(a) * radius, 0f));
             }
         }
 

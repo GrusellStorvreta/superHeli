@@ -60,6 +60,8 @@ This is the helicopter's root GameObject. It must have a **Rigidbody**.
 | `WindForce` | Reads WindZone and applies aerodynamic wind force. |
 | `MissionManager` | Mission state machine. **Disable this component by default** — MainMenuManager enables it when needed. |
 | `MissionHUD` | Mission overlay (task text, timer, hover progress). **Disable by default.** |
+| `MissionResultScreen` | Success/failure result screen with badge and navigation buttons. Always enabled. |
+| `SnowWashEffect` | Snow particle effect driven by AGL. Attach to the Particle System child object on the helicopter. |
 
 #### SimulatorDriver — Inspector fields
 
@@ -73,8 +75,10 @@ This is the helicopter's root GameObject. It must have a **Rigidbody**.
 
 | Field | Value |
 |---|---|
-| Rotor Transform | Drag in the rotor bone/mesh that should spin |
+| Rotor Transform | Drag in the main rotor bone/mesh |
+| Tail Rotor Transform | Drag in the tail rotor bone/mesh |
 | Max Rotor RPM | `600` (default) |
+| Tail Rotor RPM | `2400` (default) |
 
 #### SimulatorHUD — Inspector fields
 
@@ -100,10 +104,20 @@ This is the helicopter's root GameObject. It must have a **Rigidbody**.
 | Driver | Drag in **SimulatorDriver** |
 | Level Number | `1` (default; MainMenuManager overrides at runtime) |
 | Level 2 Checkpoints | Size 2 → drag in Ring1, Ring2 |
-| Return Scene Name | Leave empty for Level 1/2. Set `"FirstLevel"` for Level 7 scene. |
-| Rescue Zone Transform | Level 7 only — empty GameObject at rescue location |
-| Base Transform | Level 7 only — empty GameObject at base/helipad |
-| Rescue NPCs | Level 7 only — drag in RescueNPC components |
+| Rescue Zone Transform | Level 7 — empty GameObject at rescue location on mountain |
+| Base Transform | Level 7 — empty GameObject at base helipad |
+| Rescue NPCs | Leave empty for Level 7 (uses Level7NPCController instead) |
+| Level 7 NPC Parent | Drag in the **Level7_NPCs** GameObject (starts inactive) |
+| Level 7 NPCs | Drag in the **Level7NPCController** component |
+| Result Screen | Drag in the **MissionResultScreen** component |
+
+#### MissionResultScreen — Inspector fields
+
+| Field | Value |
+|---|---|
+| Mission Manager | Drag in **MissionManager** |
+| Driver | Drag in **SimulatorDriver** |
+| Nice Landing Delay | `2.5` — matches CrashHandler's niceLandingHold + niceLandingFade |
 
 #### WindForce — Inspector fields
 
@@ -299,25 +313,66 @@ Both rings start **disabled** — MissionManager activates them one at a time.
 
 ## Level 7 (Mountain Rescue) — Additional Setup
 
-Level 7 is a **separate Unity scene** (`Level7`).
+Level 7 runs in the **same scene** as Levels 1 and 2. The NPCs and rescue zone are always present in the scene but start **inactive** and are activated programmatically.
 
-The Level 7 scene needs the same base setup as above, plus:
+### Scene additions for Level 7
 
-1. **Rescue Zone**: empty GameObject at rescue location → assign to MissionManager → Rescue Zone Transform
+1. **Rescue Zone**: empty GameObject on the mountain top → assign to MissionManager → Rescue Zone Transform
 2. **Base Transform**: empty GameObject at helipad → assign to MissionManager → Base Transform
-3. Two NPCs with **RescueNPC** component → assign to MissionManager → Rescue NPCs
-4. **MissionManager**: Level Number = `7`, Return Scene Name = `"FirstLevel"`
-5. **WindZone**: MissionManager sets wind automatically (4 m/s, turbulence 0.4)
-6. Optional snow: Hierarchy → Effects → Particle System, configure as snow
+3. **Level7_NPCs** GameObject (set inactive by default):
+   ```
+   Level7_NPCs          ← Level7NPCController here, starts inactive
+   ├── Nils             ← injured survivor, Animator with lying animations
+   └── Sven             ← friend, Animator with wave + walk animations
+   ```
+4. Assign **Level7_NPCs** to MissionManager → Level 7 NPC Parent
+5. Assign **Level7NPCController** to MissionManager → Level 7 NPCs
 
-#### RescueNPC — Inspector fields
+#### Level7NPCController — Inspector fields
 
 | Field | Default |
 |---|---|
-| Pickup Radius | `15` |
-| Passenger Mass Kg | `150` |
-| Seat Offset | Position relative to helicopter where NPC sits |
-| Is Injured | `false` (true for the injured survivor) |
+| Nils Transform | Drag in Nils root GameObject |
+| Nils Animator | Drag in Nils Animator component |
+| Lying Variant Count | Number of lying animation states (typically 2–4) |
+| Lying Cycle Interval | `4` seconds between animation switches |
+| Sven Transform | Drag in Sven root GameObject |
+| Sven Animator | Drag in Sven Animator component |
+| Walk Speed | `1.4` |
+| Board Radius | `3` — how close Sven must get to helicopter |
+| Landing Radius M | `15` — helicopter must be within this distance |
+| Landing AGL Ft | `6` — helicopter must be below this height |
+
+#### Nils Animator Controller
+
+| Parameter | Type |
+|---|---|
+| `lyingVariant` | Int |
+
+States: one per lying animation. Transitions between them on `lyingVariant` value. Apply Root Motion: **off**. For all clips: Root Transform Position (Y) → Bake Into Pose: **on**, Based Upon: **Feet**.
+
+#### Sven Animator Controller
+
+| Parameter | Type |
+|---|---|
+| `startWalking` | Trigger |
+
+States: `Waving` (default, loop), `Walking`. Transition: **Any State → Walking** on `startWalking`, Has Exit Time: off. Apply Root Motion: **off**.
+
+### Snow wash effect (Level 7 / snowy scenes)
+
+1. Add a child GameObject to PlayerHelicopter: `SnowWash`
+2. Add **Particle System** to it — configure as fine white particles with cone shape, outward spread
+3. Add **SnowWashEffect** component to the same GameObject
+4. Set **Snow Enabled** on/off per scene depending on whether there's snow
+
+#### SnowWashEffect — Inspector fields
+
+| Field | Default |
+|---|---|
+| Snow Enabled | `true` for snowy scenes, `false` otherwise |
+| Max AGL M | `8` — above this height, no effect |
+| Max Emission Rate | `120` |
 
 ---
 
@@ -327,8 +382,7 @@ Add all scenes to **File → Build Settings**:
 
 | Scene | Notes |
 |---|---|
-| `Assets/FirstLevel.unity` | Main scene — contains the menu and Levels 1 & 2 |
-| `Assets/Level7.unity` | Mountain rescue scene |
+| `Assets/FirstLevel.unity` | Main scene — contains menu and all levels (1, 2, 7) |
 
 Ensure FirstLevel is **index 0** in the build list.
 
@@ -348,12 +402,15 @@ Ensure FirstLevel is **index 0** in the build list.
 | WindForce | PlayerHelicopter |
 | MissionManager | PlayerHelicopter |
 | MissionHUD | PlayerHelicopter |
+| MissionResultScreen | PlayerHelicopter |
+| SnowWashEffect | SnowWash (child of PlayerHelicopter) |
 | CameraLook | CameraPivot (child of PlayerHelicopter) |
 | CameraFollow | Follow Camera |
 | AudioListener | Follow Camera |
 | MainMenuManager | GameManager |
 | PauseManager | GameManager |
-| CheckpointRing | Ring1 / Ring2 (children of Level2) |
-| NPCPatrol | NPC root |
-| RescueNPC | NPC root (Level 7 only) |
 | NavigationHUD | GameManager or PlayerHelicopter |
+| CheckpointRing | Ring1 / Ring2 (children of Level2) |
+| NPCPatrol | NPC root (wandering NPCs) |
+| WandererNPC | NPC root (backflip wanderer) |
+| Level7NPCController | Level7_NPCs root (starts inactive) |

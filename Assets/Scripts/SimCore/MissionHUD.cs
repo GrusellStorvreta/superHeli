@@ -8,7 +8,6 @@ namespace SimCore
 
         private GUIStyle taskStyle;
         private GUIStyle timerStyle;
-        private GUIStyle resultStyle;
         private GUIStyle subStyle;
 
         private Texture2D panelTex;
@@ -39,13 +38,6 @@ namespace SimCore
 
             timerStyle = new GUIStyle(taskStyle) { fontSize = 22, alignment = TextAnchor.MiddleRight };
 
-            resultStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize  = 64,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter,
-            };
-
             subStyle = new GUIStyle(GUI.skin.label)
             {
                 fontSize  = 28,
@@ -61,11 +53,8 @@ namespace SimCore
             if (mission == null) return;
             if (taskStyle == null) BuildStyles();
 
-            var phase = mission.CurrentPhase;
-
-            if (phase == MissionManager.Phase.Success)  { DrawResult(true);  return; }
-            if (phase == MissionManager.Phase.Failed)   { DrawResult(false); return; }
-            if (phase == MissionManager.Phase.Running)  { DrawRunning();             }
+            if (mission.CurrentPhase == MissionManager.Phase.Running)
+                DrawRunning();
         }
 
         void DrawRunning()
@@ -114,30 +103,7 @@ namespace SimCore
             subStyle.fontSize = 28;
         }
 
-        void DrawResult(bool success)
-        {
-            // Semi-transparent full-screen tint
-            Color tint = success
-                ? new Color(0f, 0.05f, 0f, 0.55f)
-                : new Color(0.1f, 0f, 0f, 0.55f);
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height),
-                            success ? barGreenTex : barRedTex,
-                            ScaleMode.StretchToFill, true,
-                            0f, tint, 0f, 0f);
-
-            resultStyle.normal.textColor = success ? Green : Red;
-            GUI.Label(new Rect(0, 0, Screen.width, Screen.height),
-                      mission.CurrentInstruction, resultStyle);
-
-            if (success)
-            {
-                subStyle.normal.textColor = Color.white;
-                GUI.Label(new Rect(0, Screen.height * 0.5f + 50f, Screen.width, 50f),
-                          $"Time: {mission.FinalTime:F1} sec", subStyle);
-            }
-        }
-
-        static Texture2D MakeTex(Color c)
+static Texture2D MakeTex(Color c)
         {
             var t = new Texture2D(1, 1);
             t.SetPixel(0, 0, c);

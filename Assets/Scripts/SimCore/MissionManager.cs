@@ -20,6 +20,9 @@ namespace SimCore
         public GameObject            level7NPCParent;
         public Level7NPCController   level7NPCs;
 
+        [Header("Result Screen")]
+        public MissionResultScreen resultScreen;
+
         public enum Phase { Idle, Running, Success, Failed }
         public Phase    CurrentPhase       { get; private set; } = Phase.Idle;
         public float    TimeRemaining      { get; private set; }
@@ -356,9 +359,7 @@ namespace SimCore
             FinalTime    = timeLimit - TimeRemaining;
             CurrentPhase = Phase.Success;
             IsHoverTask  = false;
-            RefreshInstruction();
 
-            // Unlock next level
             if (levelNumber == 2)
                 GameSettings.UnlockedLevels = Mathf.Max(GameSettings.UnlockedLevels, 7);
             else if (levelNumber == 7)
@@ -366,36 +367,15 @@ namespace SimCore
             else if (GameSettings.CurrentLevel >= GameSettings.UnlockedLevels)
                 GameSettings.UnlockedLevels = GameSettings.CurrentLevel + 1;
 
-            StartCoroutine(ReturnToMenuAfterDelay(4f));
+            resultScreen?.ShowSuccess(levelNumber);
         }
 
         void Fail()
         {
-            CurrentPhase = Phase.Failed;
-            IsHoverTask  = false;
-            RefreshInstruction();
-            StartCoroutine(RestartAfterDelay(3f));
-        }
-
-        IEnumerator ReturnToMenuAfterDelay(float delay)
-        {
-            yield return new WaitForSeconds(delay);
-            CurrentPhase = Phase.Idle;
-            var drv = driver != null ? driver : FindObjectOfType<SimulatorDriver>();
-            drv?.ResetToSpawnPoint();
-            if (!string.IsNullOrEmpty(returnSceneName))
-                SceneManager.LoadScene(returnSceneName);
-            else
-                FindObjectOfType<MainMenuManager>()?.ShowMenu();
-        }
-
-        IEnumerator RestartAfterDelay(float delay)
-        {
-            yield return new WaitForSeconds(delay);
-            var drv = driver != null ? driver : FindObjectOfType<SimulatorDriver>();
-            drv?.ResetToSpawnPoint();
-            BuildLevel();
-            StartMission();
+            string reason = $"Time ran out\n{tasks[taskIdx].instruction}";
+            CurrentPhase  = Phase.Failed;
+            IsHoverTask   = false;
+            resultScreen?.ShowFailure(reason, levelNumber);
         }
 
         void UnsubscribeCurrentCheckpoint()
