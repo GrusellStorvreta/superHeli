@@ -62,12 +62,7 @@ namespace SimCore
             _visible = true;
         }
 
-        static int NextLevel(int level)
-        {
-            if (level == 1) return 2;
-            if (level == 2) return 7;
-            return -1;
-        }
+        static int NextLevel(int level) => level + 1;
 
         void Update()
         {
