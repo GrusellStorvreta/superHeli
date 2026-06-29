@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 
 namespace SimCore
 {
@@ -20,33 +19,16 @@ namespace SimCore
         public SimulatorHUD[]  hudComponents;
 
         private enum MenuPhase { Main, LevelSelect, Settings }
-        private MenuPhase _menuPhase = MenuPhase.Main;
-        private bool      _inMenu    = true;
+        private MenuPhase _menuPhase    = MenuPhase.Main;
+        private bool      _inMenu       = true;
+        private int       _selectedIndex;
 
-        private GUIStyle  _titleStyle;
-        private GUIStyle  _subtitleStyle;
-        private GUIStyle  _buttonStyle;
-        private GUIStyle  _buttonLockedStyle;
-        private GUIStyle  _backStyle;
+        private readonly MenuTheme _theme = new MenuTheme();
 
-        private Texture2D _panelTex;
-        private Texture2D _overlayTex;
-        private Texture2D _buttonTex;
-        private Texture2D _buttonHoverTex;
-        private Texture2D _buttonLockedTex;
-        private Texture2D _buttonSelectedTex;
-
-        private int _selectedIndex = 0;
-
-        private static readonly Color Amber     = new Color(1f, 0.78f, 0.08f);
-        private static readonly Color DarkPanel = new Color(0.03f, 0.05f, 0.09f, 0.92f);
-        private static readonly Color Grey      = new Color(0.4f, 0.4f, 0.4f, 0.9f);
-
-        private int ButtonCount => _menuPhase == MenuPhase.Main ? 4
-                                 : _menuPhase == MenuPhase.Settings ? 2
+        private int ButtonCount => _menuPhase == MenuPhase.Main       ? 4
+                                 : _menuPhase == MenuPhase.Settings   ? 2
                                  : 4;
 
-        // Called by MissionManager after mission success
         public void ShowMenu()
         {
             _menuPhase = MenuPhase.Main;
@@ -66,21 +48,19 @@ namespace SimCore
             var gp = Gamepad.current;
 
             bool navDown = (kb != null && (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame))
-                        || (gp != null && (gp.dpad.down.wasPressedThisFrame || (gp.leftStick.ReadValue().y < -0.5f && gp.leftStick.down.wasPressedThisFrame)));
-
-            bool navUp = (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame))
-                      || (gp != null && (gp.dpad.up.wasPressedThisFrame || (gp.leftStick.ReadValue().y > 0.5f && gp.leftStick.up.wasPressedThisFrame)));
-
+                        || (gp != null && (gp.dpad.down.wasPressedThisFrame ||
+                            (gp.leftStick.ReadValue().y < -0.5f && gp.leftStick.down.wasPressedThisFrame)));
+            bool navUp   = (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame))
+                        || (gp != null && (gp.dpad.up.wasPressedThisFrame ||
+                            (gp.leftStick.ReadValue().y > 0.5f && gp.leftStick.up.wasPressedThisFrame)));
             bool confirm = (kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
                         || (gp != null && gp.buttonSouth.wasPressedThisFrame);
-
-            bool back = (kb != null && kb.escapeKey.wasPressedThisFrame)
-                     || (gp != null && gp.buttonEast.wasPressedThisFrame);
+            bool back    = (kb != null && kb.escapeKey.wasPressedThisFrame)
+                        || (gp != null && gp.buttonEast.wasPressedThisFrame);
 
             if (navDown) _selectedIndex = (_selectedIndex + 1) % ButtonCount;
             if (navUp)   _selectedIndex = (_selectedIndex - 1 + ButtonCount) % ButtonCount;
 
-            // Volume adjust with left/right when in Settings on sound row
             if (_menuPhase == MenuPhase.Settings && _selectedIndex == 0 && GameSettings.SoundEnabled)
             {
                 bool volUp   = (kb != null && kb.rightArrowKey.wasPressedThisFrame) || (gp != null && gp.dpad.right.wasPressedThisFrame);
@@ -104,11 +84,11 @@ namespace SimCore
             }
             else if (_menuPhase == MenuPhase.LevelSelect)
             {
-                int unlocked = GameSettings.UnlockedLevels;
-                if (_selectedIndex == 0) StartGame(GameSettings.Mode.Mission, 1);
-                if (_selectedIndex == 1 && unlocked >= 2) StartGame(GameSettings.Mode.Mission, 2);
-                if (_selectedIndex == 2 && unlocked >= 7) StartGame(GameSettings.Mode.Mission, 7);
-                if (_selectedIndex == 3) GoBack();
+                int u = GameSettings.UnlockedLevels;
+                if (_selectedIndex == 0)           StartGame(GameSettings.Mode.Mission, 1);
+                if (_selectedIndex == 1 && u >= 2) StartGame(GameSettings.Mode.Mission, 2);
+                if (_selectedIndex == 2 && u >= 7) StartGame(GameSettings.Mode.Mission, 7);
+                if (_selectedIndex == 3)           GoBack();
             }
             else if (_menuPhase == MenuPhase.Settings)
             {
@@ -117,15 +97,11 @@ namespace SimCore
             }
         }
 
-        void GoBack()
-        {
-            _menuPhase = MenuPhase.Main; _selectedIndex = 0;
-        }
+        void GoBack() { _menuPhase = MenuPhase.Main; _selectedIndex = 0; }
 
         void EnterMenu()
         {
             _inMenu = true;
-
             if (menuCamera != null) menuCamera.gameObject.SetActive(true);
             if (cameraLook != null)
             {
@@ -133,13 +109,10 @@ namespace SimCore
                 foreach (var cam in cameraLook.cameras)
                     if (cam != null) cam.gameObject.SetActive(false);
             }
-
             if (helicopterRb != null) helicopterRb.isKinematic = true;
             if (driver       != null) driver.enabled           = false;
-
             foreach (var hud in hudComponents)
                 if (hud != null) hud.enabled = false;
-
             if (missionManager != null) missionManager.enabled = false;
             if (missionHUD     != null) missionHUD.enabled     = false;
         }
@@ -148,7 +121,6 @@ namespace SimCore
         {
             GameSettings.CurrentMode  = mode;
             GameSettings.CurrentLevel = level;
-
             _inMenu = false;
 
             if (menuCamera != null) menuCamera.gameObject.SetActive(false);
@@ -159,10 +131,8 @@ namespace SimCore
                 if (cams != null && cams.Length > 0 && cams[0] != null)
                     cams[0].gameObject.SetActive(true);
             }
-
             if (helicopterRb != null) helicopterRb.isKinematic = false;
             if (driver       != null) driver.enabled           = true;
-
             foreach (var hud in hudComponents)
                 if (hud != null) hud.enabled = true;
 
@@ -177,180 +147,74 @@ namespace SimCore
             }
         }
 
-        void OnEnable() => BuildStyles();
-
-        void BuildStyles()
-        {
-            _overlayTex     = MakeTex(new Color(0f, 0f, 0f, 0.45f));
-            _panelTex       = MakeTex(DarkPanel);
-            _buttonTex      = MakeTex(new Color(0.08f, 0.12f, 0.18f, 0.95f));
-            _buttonHoverTex = MakeTex(new Color(0.15f, 0.22f, 0.32f, 0.95f));
-            _buttonLockedTex    = MakeTex(new Color(0.06f, 0.06f, 0.08f, 0.85f));
-            _buttonSelectedTex  = MakeTex(new Color(0.25f, 0.35f, 0.5f, 0.98f));
-
-            _titleStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize  = 52,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter,
-            };
-            _titleStyle.normal.textColor = Amber;
-
-            _subtitleStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize  = 16,
-                alignment = TextAnchor.MiddleCenter,
-            };
-            _subtitleStyle.normal.textColor = new Color(1f, 0.78f, 0.08f, 0.55f);
-
-            _buttonStyle = new GUIStyle(GUI.skin.button)
-            {
-                fontSize  = 22,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter,
-            };
-            _buttonStyle.normal.background  = _buttonTex;
-            _buttonStyle.hover.background   = _buttonHoverTex;
-            _buttonStyle.active.background  = _buttonHoverTex;
-            _buttonStyle.normal.textColor   = Amber;
-            _buttonStyle.hover.textColor    = Color.white;
-            _buttonStyle.active.textColor   = Color.white;
-            _buttonStyle.border             = new RectOffset(4, 4, 4, 4);
-
-            _buttonLockedStyle = new GUIStyle(_buttonStyle);
-            _buttonLockedStyle.normal.background = _buttonLockedTex;
-            _buttonLockedStyle.hover.background  = _buttonLockedTex;
-            _buttonLockedStyle.normal.textColor  = Grey;
-            _buttonLockedStyle.hover.textColor   = Grey;
-
-            _backStyle = new GUIStyle(_buttonStyle) { fontSize = 16 };
-        }
+        // -------------------------------------------------------
 
         void OnGUI()
         {
             if (!_inMenu) return;
-            if (_titleStyle == null) BuildStyles();
+            _theme.Build();
 
             float sw = Screen.width;
             float sh = Screen.height;
 
-            GUI.DrawTexture(new Rect(0, 0, sw, sh), _overlayTex);
+            _theme.DrawOverlay();
 
-            float panelW = 360f;
-            float panelH = _menuPhase == MenuPhase.Main ? 450f
-                         : _menuPhase == MenuPhase.Settings ? 370f
-                         : 420f;
-            float px     = (sw - panelW) * 0.5f;
-            float py     = (sh - panelH) * 0.5f;
+            float panW = 380f;
+            float panH = _menuPhase == MenuPhase.Main     ? 460f
+                       : _menuPhase == MenuPhase.Settings ? 340f
+                       : 430f;
+            float px = (sw - panW) * 0.5f;
+            float py = (sh - panH) * 0.5f;
 
-            GUI.DrawTexture(new Rect(px, py, panelW, panelH), _panelTex);
+            _theme.DrawPanel(new Rect(px, py, panW, panH));
 
-            GUI.Label(new Rect(px, py + 20f, panelW, 80f), "SUPERHELI", _titleStyle);
-            GUI.Label(new Rect(px, py + 98f, panelW, 24f), "HELICOPTER SIMULATOR", _subtitleStyle);
+            _theme.DrawShadowedText(new Rect(px, py + 18f, panW, 72f), "SUPERHELI", _theme.TitleStyle);
+            GUI.Label(new Rect(px, py + 94f, panW, 22f), "HELICOPTER SIMULATOR", _theme.SubtitleStyle);
+            _theme.DrawSeparator(px + 30f, py + 122f, panW - 60f);
 
-            float btnW = 280f;
-            float btnH = 58f;
-            float bx   = px + (panelW - btnW) * 0.5f;
+            float btnW = 300f;
+            float btnH = 56f;
+            float bx   = px + (panW - btnW) * 0.5f;
+            float by   = py + 140f;
+            float gap  = 68f;
 
             if (_menuPhase == MenuPhase.Main)
-                DrawMainMenu(bx, py, btnW, btnH);
+            {
+                if (_theme.DrawButton(new Rect(bx, by,           btnW, btnH), "FREE FLIGHT",  _selectedIndex == 0)) StartGame(GameSettings.Mode.FreeFlight);
+                if (_theme.DrawButton(new Rect(bx, by + gap,     btnW, btnH), "MISSION MODE", _selectedIndex == 1)) { _menuPhase = MenuPhase.LevelSelect; _selectedIndex = 0; }
+                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), "SETTINGS",     _selectedIndex == 2)) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
+                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), "QUIT",         _selectedIndex == 3)) Application.Quit();
+            }
             else if (_menuPhase == MenuPhase.LevelSelect)
-                DrawLevelSelect(bx, py, btnW, btnH);
-            else
-                DrawSettings(bx, py, btnW, btnH);
-        }
-
-        void DrawMainMenu(float bx, float py, float btnW, float btnH)
-        {
-            if (GUI.Button(new Rect(bx, py + 148f, btnW, btnH), "FREE FLIGHT", StyleFor(0)))
-                StartGame(GameSettings.Mode.FreeFlight);
-
-            if (GUI.Button(new Rect(bx, py + 222f, btnW, btnH), "MISSION MODE", StyleFor(1)))
-                { _menuPhase = MenuPhase.LevelSelect; _selectedIndex = 0; }
-
-            if (GUI.Button(new Rect(bx, py + 296f, btnW, btnH), "SETTINGS", StyleFor(2)))
-                { _menuPhase = MenuPhase.Settings; _selectedIndex = 0; }
-
-            if (GUI.Button(new Rect(bx, py + 370f, btnW, btnH), "QUIT", StyleFor(3)))
-                Application.Quit();
-        }
-
-        void DrawSettings(float bx, float py, float btnW, float btnH)
-        {
-            string soundLabel = GameSettings.SoundEnabled ? "SOUND   ON" : "SOUND   OFF";
-            if (GUI.Button(new Rect(bx, py + 148f, btnW, btnH), soundLabel, StyleFor(0)))
-            { GameSettings.SoundEnabled = !GameSettings.SoundEnabled; GameSettings.ApplyAudioSettings(); }
-
-            if (GameSettings.SoundEnabled)
             {
-                float vol  = GameSettings.SoundVolume;
-                float barW = btnW - 20f;
-                float barX = bx + 10f;
-                float barY = py + 218f;
-                GUI.DrawTexture(new Rect(barX, barY, barW, 8f), _buttonLockedTex);
-                GUI.DrawTexture(new Rect(barX, barY, barW * vol, 8f), _buttonSelectedTex);
-                float newVol = GUI.HorizontalSlider(new Rect(barX, barY - 6f, barW, 20f), vol, 0f, 1f);
-                if (!Mathf.Approximately(newVol, vol))
-                { GameSettings.SoundVolume = newVol; GameSettings.ApplyAudioSettings(); }
-                GUI.Label(new Rect(bx, barY + 12f, btnW, 20f), $"VOLUME   {vol * 100f:F0}%", _subtitleStyle);
+                int u = GameSettings.UnlockedLevels;
+                if (_theme.DrawButton(new Rect(bx, by,           btnW, btnH), "LEVEL 1",                    _selectedIndex == 0))         StartGame(GameSettings.Mode.Mission, 1);
+                if (_theme.DrawButton(new Rect(bx, by + gap,     btnW, btnH), u >= 2 ? "LEVEL 2" : "LEVEL 2  \U0001F512", _selectedIndex == 1, u < 2)) StartGame(GameSettings.Mode.Mission, 2);
+                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), u >= 7 ? "LEVEL 7" : "LEVEL 7  \U0001F512", _selectedIndex == 2, u < 7)) StartGame(GameSettings.Mode.Mission, 7);
+                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), "← BACK",                    _selectedIndex == 3))         GoBack();
             }
-
-            if (GUI.Button(new Rect(bx, py + 260f, btnW, btnH), "← BACK", StyleFor(1)))
-                GoBack();
-        }
-
-        void DrawLevelSelect(float bx, float py, float btnW, float btnH)
-        {
-            int unlocked = GameSettings.UnlockedLevels;
-
-            if (GUI.Button(new Rect(bx, py + 148f, btnW, btnH), "LEVEL 1", StyleFor(0)))
-                StartGame(GameSettings.Mode.Mission, 1);
-
-            bool level2Unlocked = unlocked >= 2;
-            string level2Label  = level2Unlocked ? "LEVEL 2" : "LEVEL 2  \U0001F512";
-            if (GUI.Button(new Rect(bx, py + 222f, btnW, btnH), level2Label,
-                           level2Unlocked ? StyleFor(1) : _buttonLockedStyle))
+            else // Settings
             {
-                if (level2Unlocked) StartGame(GameSettings.Mode.Mission, 2);
+                string soundLabel = GameSettings.SoundEnabled ? "SOUND   ON" : "SOUND   OFF";
+                if (_theme.DrawButton(new Rect(bx, by, btnW, btnH), soundLabel, _selectedIndex == 0))
+                { GameSettings.SoundEnabled = !GameSettings.SoundEnabled; GameSettings.ApplyAudioSettings(); }
+
+                if (GameSettings.SoundEnabled)
+                {
+                    float vol  = GameSettings.SoundVolume;
+                    float barW = btnW - 20f;
+                    float barX = bx + 10f;
+                    float barY = by + btnH + 14f;
+                    _theme.DrawVolumeBar(new Rect(barX, barY, barW, 6f), vol);
+                    float newVol = GUI.HorizontalSlider(new Rect(barX, barY - 7f, barW, 20f), vol, 0f, 1f);
+                    if (!Mathf.Approximately(newVol, vol)) { GameSettings.SoundVolume = newVol; GameSettings.ApplyAudioSettings(); }
+                    GUI.Label(new Rect(bx, barY + 10f, btnW, 20f), $"VOLUME   {vol * 100f:F0}%", _theme.SubtitleStyle);
+                }
+
+                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), "← BACK", _selectedIndex == 1)) GoBack();
             }
-
-            bool level7Unlocked = unlocked >= 7;
-            string level7Label  = level7Unlocked ? "LEVEL 7" : "LEVEL 7  \U0001F512";
-            if (GUI.Button(new Rect(bx, py + 296f, btnW, btnH), level7Label,
-                           level7Unlocked ? StyleFor(2) : _buttonLockedStyle))
-            {
-                if (level7Unlocked) StartGame(GameSettings.Mode.Mission, 7);
-            }
-
-            if (GUI.Button(new Rect(bx, py + 374f, btnW, 36f), "← BACK", StyleFor(3)))
-                GoBack();
         }
 
-        GUIStyle StyleFor(int index)
-        {
-            if (index != _selectedIndex) return _buttonStyle;
-            var s = new GUIStyle(_buttonStyle);
-            s.normal.background = _buttonSelectedTex;
-            s.normal.textColor  = Color.white;
-            return s;
-        }
-
-        static Texture2D MakeTex(Color c)
-        {
-            var t = new Texture2D(1, 1);
-            t.SetPixel(0, 0, c);
-            t.Apply();
-            return t;
-        }
-
-        void OnDestroy()
-        {
-            if (_panelTex        != null) Destroy(_panelTex);
-            if (_overlayTex      != null) Destroy(_overlayTex);
-            if (_buttonTex       != null) Destroy(_buttonTex);
-            if (_buttonHoverTex  != null) Destroy(_buttonHoverTex);
-            if (_buttonLockedTex    != null) Destroy(_buttonLockedTex);
-            if (_buttonSelectedTex  != null) Destroy(_buttonSelectedTex);
-        }
+        void OnDestroy() => _theme.Destroy();
     }
 }
