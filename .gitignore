@@ -16,3 +16,5 @@ venv/
 # IDE
 .vscode/
 .idea/
+Assets/Levels/Hills02_Terrainmap.raw
+Assets/Levels/Hills02_Terrainmap.tiff
