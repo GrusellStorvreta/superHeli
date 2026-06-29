@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 
 namespace SimCore
 {
@@ -50,7 +49,8 @@ namespace SimCore
         {
             Time.timeScale = 1f;
             _paused        = false;
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            FindObjectOfType<SimulatorDriver>()?.ResetToSpawnPoint();
+            FindObjectOfType<MainMenuManager>()?.ShowMenu();
         }
 
         void OnGUI()

@@ -102,6 +102,7 @@ namespace SimCore
         private CheckpointCourse _activeCourse;
         private int               _courseRingIdx;
         private bool              _courseComplete;
+        private float             _completionPauseTimer;
 
         // -------------------------------------------------------
 
@@ -312,7 +313,8 @@ namespace SimCore
 
             if (_courseRingIdx >= _activeCourse.rings.Length)
             {
-                _courseComplete = true;
+                _courseComplete       = true;
+                _completionPauseTimer = 2.5f;
                 RefreshInstruction();
                 return;
             }
@@ -327,6 +329,7 @@ namespace SimCore
 
             SubscribeToCurrentCourseRing();
             RefreshInstruction();
+            UpdateNavigationTarget();
         }
 
         // -------------------------------------------------------
@@ -422,7 +425,11 @@ namespace SimCore
 
                 case TaskDef.Kind.CourseRun:
                     if (_courseComplete)
-                        AdvanceTask(pos);
+                    {
+                        _completionPauseTimer -= Time.deltaTime;
+                        if (_completionPauseTimer <= 0f)
+                            AdvanceTask(pos);
+                    }
                     break;
 
                 case TaskDef.Kind.Land:
@@ -509,9 +516,33 @@ namespace SimCore
         {
             if (taskIdx >= tasks.Length) { NavigationTarget = null; return; }
             var t = tasks[taskIdx];
-            NavigationTarget = (t.kind == TaskDef.Kind.NavigateTo && t.targetTransform != null)
-                ? (Vector3?)t.targetTransform.position
-                : null;
+
+            switch (t.kind)
+            {
+                case TaskDef.Kind.NavigateTo:
+                    NavigationTarget = t.targetTransform != null
+                        ? (Vector3?)t.targetTransform.position : null;
+                    break;
+                case TaskDef.Kind.HoverAtAGL:
+                    NavigationTarget = t.hoverAnchorTransform != null
+                        ? (Vector3?)t.hoverAnchorTransform.position : null;
+                    break;
+                case TaskDef.Kind.FlyThrough:
+                    NavigationTarget = t.checkpoint != null
+                        ? (Vector3?)t.checkpoint.transform.position : null;
+                    break;
+                case TaskDef.Kind.CourseRun:
+                    NavigationTarget = _activeCourse != null && _courseRingIdx < _activeCourse.rings.Length
+                        ? (Vector3?)_activeCourse.rings[_courseRingIdx].transform.position : null;
+                    break;
+                case TaskDef.Kind.Land:
+                    NavigationTarget = driver?.spawnPoint != null
+                        ? (Vector3?)driver.spawnPoint.position : null;
+                    break;
+                default:
+                    NavigationTarget = null;
+                    break;
+            }
         }
 
         void OnCheckpointPassed() => _checkpointPassed = true;
@@ -594,7 +625,7 @@ namespace SimCore
             {
                 int total = _activeCourse.rings.Length;
                 CurrentInstruction = _courseComplete
-                    ? "All checkpoints done! Land the helicopter"
+                    ? "Great flying!  Now land the helicopter"
                     : $"Checkpoint  {_courseRingIdx + 1} / {total}";
             }
             else
