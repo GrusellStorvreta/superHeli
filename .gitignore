@@ -18,3 +18,5 @@ venv/
 .idea/
 Assets/Levels/Hills02_Terrainmap.raw
 Assets/Levels/Hills02_Terrainmap.tiff
+Assets/Levels/Hills02_Heightmap.tiff
+Assets/Levels/LevelOneheightmap.raw
