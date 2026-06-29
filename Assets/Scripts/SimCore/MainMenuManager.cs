@@ -47,26 +47,18 @@ namespace SimCore
             var kb = Keyboard.current;
             var gp = Gamepad.current;
 
-            bool navDown = (kb != null && (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame))
-                        || (gp != null && (gp.dpad.down.wasPressedThisFrame ||
-                            (gp.leftStick.ReadValue().y < -0.5f && gp.leftStick.down.wasPressedThisFrame)));
-            bool navUp   = (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame))
-                        || (gp != null && (gp.dpad.up.wasPressedThisFrame ||
-                            (gp.leftStick.ReadValue().y > 0.5f && gp.leftStick.up.wasPressedThisFrame)));
-            bool confirm = (kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
-                        || (gp != null && gp.buttonSouth.wasPressedThisFrame);
-            bool back    = (kb != null && kb.escapeKey.wasPressedThisFrame)
-                        || (gp != null && gp.buttonEast.wasPressedThisFrame);
+            bool navDown = MenuTheme.NavDown(kb, gp);
+            bool navUp   = MenuTheme.NavUp(kb, gp);
+            bool confirm = MenuTheme.Confirm(kb, gp);
+            bool back    = MenuTheme.Back(kb, gp);
 
             if (navDown) _selectedIndex = (_selectedIndex + 1) % ButtonCount;
             if (navUp)   _selectedIndex = (_selectedIndex - 1 + ButtonCount) % ButtonCount;
 
             if (_menuPhase == MenuPhase.Settings && _selectedIndex == 0 && GameSettings.SoundEnabled)
             {
-                bool volUp   = (kb != null && kb.rightArrowKey.wasPressedThisFrame) || (gp != null && gp.dpad.right.wasPressedThisFrame);
-                bool volDown = (kb != null && kb.leftArrowKey.wasPressedThisFrame)  || (gp != null && gp.dpad.left.wasPressedThisFrame);
-                if (volUp)   { GameSettings.SoundVolume = Mathf.Clamp01(GameSettings.SoundVolume + 0.1f); GameSettings.ApplyAudioSettings(); }
-                if (volDown) { GameSettings.SoundVolume = Mathf.Clamp01(GameSettings.SoundVolume - 0.1f); GameSettings.ApplyAudioSettings(); }
+                if (MenuTheme.NavRight(kb, gp)) { GameSettings.SoundVolume = Mathf.Clamp01(GameSettings.SoundVolume + 0.1f); GameSettings.ApplyAudioSettings(); }
+                if (MenuTheme.NavLeft(kb, gp))  { GameSettings.SoundVolume = Mathf.Clamp01(GameSettings.SoundVolume - 0.1f); GameSettings.ApplyAudioSettings(); }
             }
 
             if (confirm) ConfirmSelected();

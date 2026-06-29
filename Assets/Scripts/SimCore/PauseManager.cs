@@ -21,14 +21,10 @@ namespace SimCore
 
             if (!_paused) return;
 
-            bool navDown = (kb != null && (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame))
-                        || (gp != null && gp.dpad.down.wasPressedThisFrame);
-            bool navUp   = (kb != null && (kb.upArrowKey.wasPressedThisFrame   || kb.wKey.wasPressedThisFrame))
-                        || (gp != null && gp.dpad.up.wasPressedThisFrame);
-            bool confirm = (kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
-                        || (gp != null && gp.buttonSouth.wasPressedThisFrame);
-            bool back    = (kb != null && kb.escapeKey.wasPressedThisFrame)
-                        || (gp != null && gp.buttonEast.wasPressedThisFrame);
+            bool navDown = MenuTheme.NavDown(kb, gp);
+            bool navUp   = MenuTheme.NavUp(kb, gp);
+            bool confirm = MenuTheme.Confirm(kb, gp);
+            bool back    = MenuTheme.Back(kb, gp);
 
             if (navDown) _selectedIndex = (_selectedIndex + 1) % 2;
             if (navUp)   _selectedIndex = (_selectedIndex - 1 + 2) % 2;
