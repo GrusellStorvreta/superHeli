@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace SimCore
@@ -96,7 +97,15 @@ namespace SimCore
             if (!result.success) return;
             if (Random.value < clappingChanceLanding)
                 PlayClapping();
-            speech?.Say("landing.success");
+            StartCoroutine(LandingSpeechDelayed());
+        }
+
+        IEnumerator LandingSpeechDelayed()
+        {
+            yield return null; // wait one frame so Succeed() can run first
+            bool missionJustSucceeded = _mission != null &&
+                                        _mission.CurrentPhase == MissionManager.Phase.Success;
+            speech?.Say(missionJustSucceeded ? "mission.success" : "landing.success");
         }
 
         void OnCheckpointPassed()
