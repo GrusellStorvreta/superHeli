@@ -33,6 +33,14 @@ namespace SimCore
             _driver         = FindObjectOfType<SimulatorDriver>();
             _landingChecker = FindObjectOfType<LandingChecker>();
             if (_landingChecker != null) _landingChecker.OnLanding += OnLanding;
+
+            // Disable emission immediately — Update controls rate from here
+            if (_ps != null)
+            {
+                var emission = _ps.emission;
+                emission.rateOverTime = 0f;
+                _ps.Clear();
+            }
         }
 
         void OnDestroy()
