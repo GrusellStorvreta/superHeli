@@ -104,7 +104,7 @@ namespace SimCore
             titleStyle.fontSize = 36;
             titleStyle.normal.textColor = _isSuccess ? MenuTheme.Green : MenuTheme.Red;
             _theme.DrawShadowedText(new Rect(px, py + 18f, panW, 50f),
-                _isSuccess ? "MISSION COMPLETE" : "MISSION FAILED", titleStyle);
+                _isSuccess ? Loc.Get("result.complete") : Loc.Get("result.failed"), titleStyle);
 
             _theme.DrawSeparator(px + 30f, py + 74f, panW - 60f);
 
@@ -122,13 +122,13 @@ namespace SimCore
                 infoStyle.fontSize = 20;
                 infoStyle.normal.textColor = MenuTheme.Amber;
                 GUI.Label(new Rect(px, py + 182f, panW, 30f),
-                    $"Completed in  {missionManager?.FinalTime:F1} sec", infoStyle);
+                    Loc.Get("result.time", missionManager?.FinalTime ?? 0f), infoStyle);
 
                 _theme.DrawSeparator(px + 30f, py + 220f, panW - 60f);
 
-                if (_theme.DrawButton(new Rect(bx, py + 238f, btnW, btnH), $"CONTINUE  →  LEVEL {_nextLevel}", _selectedIndex == 0))
+                if (_theme.DrawButton(new Rect(bx, py + 238f, btnW, btnH), Loc.Get("result.continue", _nextLevel), _selectedIndex == 0))
                     ContinueToLevel(_nextLevel);
-                if (_theme.DrawButton(new Rect(bx, py + 312f, btnW, btnH), "BACK TO MENU", _selectedIndex == 1))
+                if (_theme.DrawButton(new Rect(bx, py + 312f, btnW, btnH), Loc.Get("result.back"), _selectedIndex == 1))
                     BackToMenu();
             }
             else
@@ -140,9 +140,9 @@ namespace SimCore
 
                 _theme.DrawSeparator(px + 30f, py + 178f, panW - 60f);
 
-                if (_theme.DrawButton(new Rect(bx, py + 196f, btnW, btnH), "TRY AGAIN", _selectedIndex == 0))
+                if (_theme.DrawButton(new Rect(bx, py + 196f, btnW, btnH), Loc.Get("result.try_again"), _selectedIndex == 0))
                     TryAgain();
-                if (_theme.DrawButton(new Rect(bx, py + 270f, btnW, btnH), "BACK TO MENU", _selectedIndex == 1))
+                if (_theme.DrawButton(new Rect(bx, py + 270f, btnW, btnH), Loc.Get("result.back"), _selectedIndex == 1))
                     BackToMenu();
             }
         }

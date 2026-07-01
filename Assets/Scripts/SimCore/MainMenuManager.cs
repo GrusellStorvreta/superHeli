@@ -50,8 +50,8 @@ namespace SimCore
         {
             _levelList = new List<(int, string)>
             {
-                (1, "LEVEL 1"),
-                (2, "LEVEL 2"),
+                (1, Loc.Get("menu.level", 1)),
+                (2, Loc.Get("menu.level", 2)),
             };
 
             if (missionManager != null && missionManager.courses != null)
@@ -59,7 +59,7 @@ namespace SimCore
                     if (c != null)
                         _levelList.Add((c.levelNumber, c.courseName.ToUpper()));
 
-            _levelList.Add((7, "LEVEL 7"));
+            _levelList.Add((7, Loc.Get("menu.level", 7)));
             _levelList.Sort((a, b) => a.num.CompareTo(b.num));
         }
 
@@ -192,8 +192,8 @@ namespace SimCore
 
             _theme.DrawPanel(new Rect(px, py, panW, panH));
 
-            _theme.DrawShadowedText(new Rect(px, py + 18f, panW, 72f), "SUPERHELI", _theme.TitleStyle);
-            GUI.Label(new Rect(px, py + 94f, panW, 22f), "HELICOPTER SIMULATOR", _theme.SubtitleStyle);
+            _theme.DrawShadowedText(new Rect(px, py + 18f, panW, 72f), Loc.Get("menu.title"), _theme.TitleStyle);
+            GUI.Label(new Rect(px, py + 94f, panW, 22f), Loc.Get("menu.subtitle"), _theme.SubtitleStyle);
             _theme.DrawSeparator(px + 30f, py + 122f, panW - 60f);
 
             float btnW = 300f;
@@ -203,10 +203,10 @@ namespace SimCore
 
             if (_menuPhase == MenuPhase.Main)
             {
-                if (_theme.DrawButton(new Rect(bx, by,           btnW, btnH), "FREE FLIGHT",  _selectedIndex == 0)) StartGame(GameSettings.Mode.FreeFlight);
-                if (_theme.DrawButton(new Rect(bx, by + gap,     btnW, btnH), "MISSION MODE", _selectedIndex == 1)) { _menuPhase = MenuPhase.LevelSelect; _selectedIndex = 0; }
-                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), "SETTINGS",     _selectedIndex == 2)) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
-                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), "QUIT",         _selectedIndex == 3)) QuitGame();
+                if (_theme.DrawButton(new Rect(bx, by,           btnW, btnH), Loc.Get("menu.free_flight"), _selectedIndex == 0)) StartGame(GameSettings.Mode.FreeFlight);
+                if (_theme.DrawButton(new Rect(bx, by + gap,     btnW, btnH), Loc.Get("menu.missions"),    _selectedIndex == 1)) { _menuPhase = MenuPhase.LevelSelect; _selectedIndex = 0; }
+                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), Loc.Get("menu.settings"),    _selectedIndex == 2)) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
+                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), Loc.Get("menu.quit"),        _selectedIndex == 3)) QuitGame();
             }
             else if (_menuPhase == MenuPhase.LevelSelect)
             {
@@ -219,12 +219,12 @@ namespace SimCore
                     if (_theme.DrawButton(new Rect(bx, by + gap * i, btnW, btnH), lbl, _selectedIndex == i, locked))
                         if (!locked) StartGame(GameSettings.Mode.Mission, lvl.num);
                 }
-                if (_theme.DrawButton(new Rect(bx, by + gap * _levelList.Count, btnW, btnH), "← BACK", _selectedIndex == _levelList.Count))
+                if (_theme.DrawButton(new Rect(bx, by + gap * _levelList.Count, btnW, btnH), Loc.Get("menu.back"), _selectedIndex == _levelList.Count))
                     GoBack();
             }
             else // Settings
             {
-                string soundLabel = GameSettings.SoundEnabled ? "SOUND   ON" : "SOUND   OFF";
+                string soundLabel = GameSettings.SoundEnabled ? Loc.Get("menu.sound_on") : Loc.Get("menu.sound_off");
                 if (_theme.DrawButton(new Rect(bx, by, btnW, btnH), soundLabel, _selectedIndex == 0))
                 { GameSettings.SoundEnabled = !GameSettings.SoundEnabled; GameSettings.ApplyAudioSettings(); }
 
@@ -237,10 +237,10 @@ namespace SimCore
                     _theme.DrawVolumeBar(new Rect(barX, barY, barW, 6f), vol);
                     float newVol = GUI.HorizontalSlider(new Rect(barX, barY - 7f, barW, 20f), vol, 0f, 1f);
                     if (!Mathf.Approximately(newVol, vol)) { GameSettings.SoundVolume = newVol; GameSettings.ApplyAudioSettings(); }
-                    GUI.Label(new Rect(bx, barY + 10f, btnW, 20f), $"VOLUME   {vol * 100f:F0}%", _theme.SubtitleStyle);
+                    GUI.Label(new Rect(bx, barY + 10f, btnW, 20f), Loc.Get("menu.volume", (int)(vol * 100f)), _theme.SubtitleStyle);
                 }
 
-                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), "← BACK", _selectedIndex == 1)) GoBack();
+                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), Loc.Get("menu.back"), _selectedIndex == 1)) GoBack();
             }
         }
 

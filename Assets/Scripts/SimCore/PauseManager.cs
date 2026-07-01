@@ -64,14 +64,14 @@ namespace SimCore
             float py = (sh - panH) * 0.5f;
 
             _theme.DrawPanel(new Rect(px, py, panW, panH));
-            _theme.DrawShadowedText(new Rect(px, py + 18f, panW, 52f), "PAUSED", _theme.TitleStyle);
+            _theme.DrawShadowedText(new Rect(px, py + 18f, panW, 52f), Loc.Get("pause.title"), _theme.TitleStyle);
             _theme.DrawSeparator(px + 30f, py + 76f, panW - 60f);
 
             float btnW = 280f, btnH = 56f;
             float bx = px + (panW - btnW) * 0.5f;
 
-            if (_theme.DrawButton(new Rect(bx, py + 100f, btnW, btnH), "RESUME",    _selectedIndex == 0)) Resume();
-            if (_theme.DrawButton(new Rect(bx, py + 174f, btnW, btnH), "MAIN MENU", _selectedIndex == 1)) ReturnToMenu();
+            if (_theme.DrawButton(new Rect(bx, py + 100f, btnW, btnH), Loc.Get("pause.resume"),    _selectedIndex == 0)) Resume();
+            if (_theme.DrawButton(new Rect(bx, py + 174f, btnW, btnH), Loc.Get("pause.main_menu"), _selectedIndex == 1)) ReturnToMenu();
         }
 
         void OnDestroy()

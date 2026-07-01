@@ -181,12 +181,12 @@ namespace SimCore
             tasks        = new TaskDef[]
             {
                 new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 100f,
-                              instruction = "Climb to 100 ft AGL" },
+                              instruction = Loc.Get("instr.climb_100") },
                 new TaskDef { kind = TaskDef.Kind.HoverAtAGL, targetAglFt = 100f,
                               hoverDuration = 5f, maxDeviationFt = 3f,
-                              instruction   = "Hover at 100 ft  (±3 ft)  for 5 sec" },
+                              instruction   = Loc.Get("instr.hover_100") },
                 new TaskDef { kind = TaskDef.Kind.Land,
-                              instruction = "Land the helicopter" },
+                              instruction = Loc.Get("instr.land") },
             };
         }
 
@@ -205,31 +205,31 @@ namespace SimCore
             {
                 new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 200f,
                               taskTimeLimit = 30f,
-                              instruction = "Climb to 200 ft AGL" },
+                              instruction = Loc.Get("instr.climb_200") },
                 new TaskDef { kind = TaskDef.Kind.HoverAtAGL, targetAglFt = 200f,
                               hoverDuration = 3f, maxDeviationFt = 5f,
                               hoverAnchorTransform = anchor1,
                               taskTimeLimit = 20f,
-                              instruction   = "Hover at 200 ft  (±5 ft)  for 3 sec" },
+                              instruction   = Loc.Get("instr.hover_200") },
                 new TaskDef { kind = TaskDef.Kind.FlyThrough, checkpoint = ring1,
                               taskTimeLimit = 45f,
-                              instruction = "Fly through Checkpoint 1" },
+                              instruction = Loc.Get("instr.checkpoint_1") },
                 new TaskDef { kind = TaskDef.Kind.HoverAtAGL, targetAglFt = 200f,
                               hoverDuration = 3f, maxDeviationFt = 5f,
                               hoverAnchorTransform = anchor2,
                               taskTimeLimit = 20f,
-                              instruction   = "Hover at 200 ft  (±5 ft)  for 3 sec" },
+                              instruction   = Loc.Get("instr.hover_200") },
                 new TaskDef { kind = TaskDef.Kind.FlyThrough, checkpoint = ring2,
                               taskTimeLimit = 45f,
-                              instruction = "Fly through Checkpoint 2  (turn around!)" },
+                              instruction = Loc.Get("instr.checkpoint_2") },
                 new TaskDef { kind = TaskDef.Kind.HoverAtAGL, targetAglFt = 200f,
                               hoverDuration = 3f, maxDeviationFt = 5f,
                               hoverAnchorTransform = anchor3,
                               taskTimeLimit = 20f,
-                              instruction   = "Hover at 200 ft  (±5 ft)  for 3 sec" },
+                              instruction   = Loc.Get("instr.hover_200") },
                 new TaskDef { kind = TaskDef.Kind.Land,
                               taskTimeLimit = 30f,
-                              instruction = "Land the helicopter" },
+                              instruction = Loc.Get("instr.land") },
             };
         }
 
@@ -243,9 +243,9 @@ namespace SimCore
             tasks = new TaskDef[]
             {
                 new TaskDef { kind = TaskDef.Kind.CourseRun,
-                              instruction = $"Fly through all {ringCount} checkpoints!" },
+                              instruction = Loc.Get("instr.course", ringCount) },
                 new TaskDef { kind = TaskDef.Kind.Land,
-                              instruction = "Land the helicopter" },
+                              instruction = Loc.Get("instr.land") },
             };
         }
 
@@ -263,15 +263,15 @@ namespace SimCore
             tasks = new TaskDef[]
             {
                 new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 50f,
-                              instruction = "Climb to 50 ft AGL" },
+                              instruction = Loc.Get("instr.climb_50") },
                 new TaskDef { kind = TaskDef.Kind.NavigateTo, targetTransform = rescueZoneTransform,
-                              radiusM = 100f, instruction = "Fly to rescue zone" },
+                              radiusM = 100f, instruction = Loc.Get("instr.rescue_zone") },
                 new TaskDef { kind = TaskDef.Kind.PickupNPCs,
-                              instruction = "Land and pick up survivors" },
+                              instruction = Loc.Get("instr.land_pickup") },
                 new TaskDef { kind = TaskDef.Kind.NavigateTo, targetTransform = baseTransform,
-                              radiusM = 80f, instruction = "Return to base" },
+                              radiusM = 80f, instruction = Loc.Get("instr.return_base") },
                 new TaskDef { kind = TaskDef.Kind.Land,
-                              instruction = "Land the helicopter" },
+                              instruction = Loc.Get("instr.land") },
             };
         }
 
@@ -646,8 +646,8 @@ namespace SimCore
 
         void RefreshInstruction()
         {
-            if (CurrentPhase == Phase.Success) { CurrentInstruction = "MISSION COMPLETE"; return; }
-            if (CurrentPhase == Phase.Failed)  { CurrentInstruction = "TIME'S UP";        return; }
+            if (CurrentPhase == Phase.Success) { CurrentInstruction = Loc.Get("result.complete"); return; }
+            if (CurrentPhase == Phase.Failed)  { CurrentInstruction = Loc.Get("result.timesup");  return; }
             if (taskIdx >= tasks.Length)       { CurrentInstruction = "";                  return; }
 
             var t = tasks[taskIdx];

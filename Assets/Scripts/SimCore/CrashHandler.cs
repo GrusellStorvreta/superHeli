@@ -112,7 +112,7 @@ namespace SimCore
                         crashStyle = MakeCenteredStyle(80, FontStyle.Bold);
 
                     crashStyle.normal.textColor = new Color(1f, 1f, 1f, Mathf.Clamp01(overlayAlpha * 2f));
-                    GUI.Label(new Rect(0, 0, Screen.width, Screen.height), "CRASH!", crashStyle);
+                    GUI.Label(new Rect(0, 0, Screen.width, Screen.height), Loc.Get("crash.text"), crashStyle);
                 }
             }
 
@@ -122,7 +122,7 @@ namespace SimCore
                     niceStyle = MakeCenteredStyle(60, FontStyle.Bold);
 
                 niceStyle.normal.textColor = new Color(0.4f, 1f, 0.4f, niceLandingAlpha);
-                GUI.Label(new Rect(0, 0, Screen.width, Screen.height), "Nice landing!", niceStyle);
+                GUI.Label(new Rect(0, 0, Screen.width, Screen.height), Loc.Get("crash.nice_landing"), niceStyle);
             }
         }
 

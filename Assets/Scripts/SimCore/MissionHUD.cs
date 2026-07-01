@@ -98,7 +98,7 @@ namespace SimCore
             // Zone status label
             subStyle.fontSize = 15;
             subStyle.normal.textColor = mission.HoverInZone ? Green : DimAmber;
-            string zoneLabel = mission.HoverInZone ? "IN ZONE" : "OUT OF ZONE — hold position";
+            string zoneLabel = mission.HoverInZone ? Loc.Get("hud.in_zone") : Loc.Get("hud.out_of_zone");
             GUI.Label(new Rect(pbX, pbY + pbH + 2f, pbW, 22f), zoneLabel, subStyle);
             subStyle.fontSize = 28;
         }

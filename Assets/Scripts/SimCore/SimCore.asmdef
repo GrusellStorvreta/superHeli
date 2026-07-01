@@ -1,7 +1,7 @@
 {
   "name": "SimCore",
   "rootNamespace": "",
-  "references": [ "Unity.InputSystem" ],
+  "references": [ "Unity.InputSystem", "Unity.Localization" ],
   "optionalUnityReferences": [],
   "includePlatforms": [],
   "excludePlatforms": [],
