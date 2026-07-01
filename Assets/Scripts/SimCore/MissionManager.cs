@@ -37,12 +37,9 @@ namespace SimCore
         public class CourseWaypoint
         {
             public enum Kind { Checkpoint, HoverBox }
-            public Kind           kind         = Kind.Checkpoint;
-            public CheckpointRing ring;                               // if Checkpoint
-            public Transform      boxCenter;                          // if HoverBox
-            public Vector3        boxSize      = new Vector3(20f, 15f, 20f);
-            public float          holdDuration = 5f;
-            public GameObject     boxVisual;                          // optional scene object to show/hide
+            public Kind           kind     = Kind.Checkpoint;
+            public CheckpointRing ring;       // if Checkpoint
+            public HoverBoxMarker hoverBox;   // if HoverBox
         }
 
         [Serializable]
@@ -309,7 +306,7 @@ namespace SimCore
             foreach (var wp in _activeCourse.waypoints)
             {
                 wp.ring?.gameObject.SetActive(false);
-                if (wp.boxVisual != null) wp.boxVisual.SetActive(false);
+                wp.hoverBox?.gameObject.SetActive(false);
             }
 
             SetupCurrentWaypoint();
@@ -328,7 +325,7 @@ namespace SimCore
             }
             else
             {
-                if (wp.boxVisual != null) wp.boxVisual.SetActive(true);
+                wp.hoverBox?.gameObject.SetActive(true);
                 hoverTimer    = 0f;
                 HoverProgress = 0f;
             }
@@ -371,7 +368,7 @@ namespace SimCore
                 if (wp.kind == CourseWaypoint.Kind.Checkpoint)
                     wp.ring?.gameObject.SetActive(false);
                 else
-                    if (wp.boxVisual != null) wp.boxVisual.SetActive(false);
+                    wp.hoverBox?.gameObject.SetActive(false);
 
                 IsHoverTask   = false;
                 hoverTimer    = 0f;
@@ -416,19 +413,16 @@ namespace SimCore
         void EvaluateCourseHover(Vector3 pos)
         {
             var wp = CurrentWaypoint;
-            if (wp?.boxCenter == null) return;
+            if (wp?.hoverBox == null) return;
 
             IsHoverTask = true;
-            Vector3 local = pos - wp.boxCenter.position;
-            HoverInZone = Mathf.Abs(local.x) < wp.boxSize.x * 0.5f &&
-                          Mathf.Abs(local.y) < wp.boxSize.y * 0.5f &&
-                          Mathf.Abs(local.z) < wp.boxSize.z * 0.5f;
+            HoverInZone = wp.hoverBox.IsInside(pos);
 
             if (HoverInZone)
             {
                 hoverTimer    += Time.deltaTime;
-                HoverProgress  = Mathf.Clamp01(hoverTimer / wp.holdDuration);
-                if (hoverTimer >= wp.holdDuration)
+                HoverProgress  = Mathf.Clamp01(hoverTimer / wp.hoverBox.holdDuration);
+                if (hoverTimer >= wp.hoverBox.holdDuration)
                 {
                     OnHoverTaskComplete?.Invoke();
                     AdvanceCourseWaypoint();
@@ -662,7 +656,7 @@ namespace SimCore
                     NavigationTarget = cw == null ? null
                         : cw.kind == CourseWaypoint.Kind.Checkpoint && cw.ring != null
                             ? (Vector3?)cw.ring.transform.position
-                            : cw.boxCenter != null ? (Vector3?)cw.boxCenter.position : null;
+                            : cw.hoverBox != null ? (Vector3?)cw.hoverBox.transform.position : null;
                     break;
                 case TaskDef.Kind.Land:
                     NavigationTarget = driver?.spawnPoint != null
