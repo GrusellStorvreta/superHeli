@@ -53,6 +53,11 @@ namespace SimCore
         public bool     IsHoverTask        { get; private set; }
         public string   CurrentInstruction { get; private set; } = "";
         public float    FinalTime          { get; private set; }
+
+        public event System.Action OnMissionStarted;
+        public event System.Action OnMissionSuccess;
+        public event System.Action OnCheckpointPassed;
+        public event System.Action OnHoverTaskComplete;
         public Vector3? NavigationTarget   { get; private set; }
 
         private const float MToFt = 3.28084f;
@@ -325,6 +330,7 @@ namespace SimCore
             _activeCourse.rings[_courseRingIdx]?.gameObject.SetActive(false);
 
             _courseRingIdx++;
+            OnCheckpointPassed?.Invoke();
 
             if (_courseRingIdx >= _activeCourse.rings.Length)
             {
@@ -379,6 +385,7 @@ namespace SimCore
 
             RefreshInstruction();
             UpdateNavigationTarget();
+            OnMissionStarted?.Invoke();
         }
 
         void Update()
@@ -424,7 +431,10 @@ namespace SimCore
                         hoverTimer   += Time.deltaTime;
                         HoverProgress = Mathf.Clamp01(hoverTimer / t.hoverDuration);
                         if (hoverTimer >= t.hoverDuration)
+                        {
+                            OnHoverTaskComplete?.Invoke();
                             AdvanceTask(pos);
+                        }
                     }
                     else
                     {
@@ -614,6 +624,7 @@ namespace SimCore
             GameSettings.UnlockedLevels = Mathf.Max(GameSettings.UnlockedLevels, defaultLevelNumber + 1);
 
             resultScreen?.ShowSuccess(defaultLevelNumber);
+            OnMissionSuccess?.Invoke();
         }
 
         void Fail()

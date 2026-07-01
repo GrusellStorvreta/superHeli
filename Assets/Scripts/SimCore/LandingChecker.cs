@@ -28,15 +28,24 @@ namespace SimCore
         public LandingResult LastResult { get; private set; }
 
         private Rigidbody rb;
+        private bool      _hasBeenAirborne;
 
         void Awake()
         {
             rb = GetComponent<Rigidbody>();
         }
 
+        void FixedUpdate()
+        {
+            if (rb != null && rb.velocity.y > 0.5f)
+                _hasBeenAirborne = true;
+        }
+
         void OnCollisionEnter(Collision collision)
         {
-            if (rb == null) return;
+            if (rb == null || !_hasBeenAirborne) return;
+            _hasBeenAirborne = false;
+
             Vector3 contactPoint = collision.contacts[0].point;
             var result = CheckLanding(rb, contactPoint);
             LastResult = result;

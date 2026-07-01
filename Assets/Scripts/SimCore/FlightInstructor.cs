@@ -43,15 +43,13 @@ namespace SimCore
         [Range(0f, 1f)]
         public float         clappingChanceLanding = 0.6f;   // nice landing
 
-        private SimulatorDriver         _driver;
-        private MissionManager          _mission;
-        private LandingChecker          _landingChecker;
+        private SimulatorDriver _driver;
+        private MissionManager  _mission;
+        private LandingChecker  _landingChecker;
 
-        private float                   _headSlapCooldown;
-        private float                   _talkTimer;
-        private float                   _busyTimer;           // non-idle animation playing
-        private bool                    _hoverWasComplete;
-        private MissionManager.Phase    _prevPhase;
+        private float _headSlapCooldown;
+        private float _talkTimer;
+        private float _busyTimer;
 
         private const float MsToKts = 1.94384f;
         private const float MToFt   = 3.28084f;
@@ -61,10 +59,15 @@ namespace SimCore
             _driver  = FindObjectOfType<SimulatorDriver>();
             _mission = FindObjectOfType<MissionManager>();
             if (animator == null) animator = GetComponent<Animator>();
-            _prevPhase = _mission != null ? _mission.CurrentPhase : MissionManager.Phase.Idle;
 
             _landingChecker = FindObjectOfType<LandingChecker>();
             if (_landingChecker != null) _landingChecker.OnLanding += OnLanding;
+
+            if (_mission != null)
+            {
+                _mission.OnMissionSuccess    += OnMissionSuccess;
+                _mission.OnHoverTaskComplete += OnHoverTaskComplete;
+            }
 
             ScheduleNextTalk();
         }
@@ -72,11 +75,28 @@ namespace SimCore
         void OnDestroy()
         {
             if (_landingChecker != null) _landingChecker.OnLanding -= OnLanding;
+            if (_mission != null)
+            {
+                _mission.OnMissionSuccess    -= OnMissionSuccess;
+                _mission.OnHoverTaskComplete -= OnHoverTaskComplete;
+            }
         }
 
         void OnLanding(LandingResult result)
         {
             if (result.success && Random.value < clappingChanceLanding)
+                PlayClapping();
+        }
+
+        void OnMissionSuccess()
+        {
+            if (Random.value < clappingChanceSuccess)
+                PlayClapping();
+        }
+
+        void OnHoverTaskComplete()
+        {
+            if (Random.value < clappingChanceHover)
                 PlayClapping();
         }
 
@@ -91,9 +111,6 @@ namespace SimCore
 
             CheckHeadslap();
             if (_busyTimer <= 0f) CheckTalk();
-            CheckMissionEvents();
-
-            if (_mission != null) _prevPhase = _mission.CurrentPhase;
         }
 
         // --- Condition checks ---
@@ -119,32 +136,6 @@ namespace SimCore
             if (Random.value < talkChance)
                 PlayTalking();
             ScheduleNextTalk();
-        }
-
-        void CheckMissionEvents()
-        {
-            if (_mission == null) return;
-
-            // Mission just succeeded → clapping
-            if (_prevPhase == MissionManager.Phase.Running &&
-                _mission.CurrentPhase == MissionManager.Phase.Success)
-            {
-                if (Random.value < clappingChanceSuccess)
-                    PlayClapping();
-                return;
-            }
-
-            // Hover task just completed → clapping
-            if (_mission.IsHoverTask && _mission.HoverProgress >= 1f && !_hoverWasComplete)
-            {
-                _hoverWasComplete = true;
-                if (Random.value < clappingChanceHover)
-                    PlayClapping();
-            }
-            else if (!_mission.IsHoverTask || _mission.HoverProgress < 0.9f)
-            {
-                _hoverWasComplete = false;
-            }
         }
 
         // --- Playback helpers ---
