@@ -105,6 +105,8 @@ namespace SimCore
         private bool              _courseComplete;
         private float             _completionPauseTimer;
 
+        private CrashHandler _crashHandler;
+
         // -------------------------------------------------------
 
         void Start()
@@ -113,6 +115,8 @@ namespace SimCore
             if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
             landingChecker = FindObjectOfType<LandingChecker>();
             if (landingChecker != null) landingChecker.OnLanding += OnLanding;
+            _crashHandler = FindObjectOfType<CrashHandler>();
+            if (_crashHandler != null) _crashHandler.OnCrashReset += HandleCrashReset;
             BuildLevel();
             StartMission();
         }
@@ -126,6 +130,11 @@ namespace SimCore
             {
                 landingChecker = FindObjectOfType<LandingChecker>();
                 if (landingChecker != null) landingChecker.OnLanding += OnLanding;
+            }
+            if (_crashHandler == null)
+            {
+                _crashHandler = FindObjectOfType<CrashHandler>();
+                if (_crashHandler != null) _crashHandler.OnCrashReset += HandleCrashReset;
             }
             BuildLevel();
             StartMission();
@@ -553,43 +562,43 @@ namespace SimCore
 
         void OnCheckpointPassed() => _checkpointPassed = true;
 
-        void OnLanding(LandingResult result)
+        void HandleCrashReset()
         {
             if (CurrentPhase != Phase.Running) return;
 
-            if (!result.success)
+            UnsubscribeCurrentCheckpoint();
+            UnsubscribeFromCurrentCourseRing();
+
+            taskIdx           = 0;
+            hoverTimer        = 0f;
+            HoverProgress     = 0f;
+            HoverInZone       = false;
+            IsHoverTask       = false;
+            landingReceived   = false;
+            _checkpointPassed = false;
+
+            if (level2Checkpoints != null)
+                foreach (var r in level2Checkpoints)
+                    if (r != null) r.gameObject.SetActive(false);
+
+            if (rescueNPCs != null)
+                foreach (var npc in rescueNPCs)
+                    if (npc != null) npc.Unboard();
+
+            if (_activeCourse != null && tasks[0].kind == TaskDef.Kind.CourseRun)
             {
-                UnsubscribeCurrentCheckpoint();
-                UnsubscribeFromCurrentCourseRing();
-
-                taskIdx           = 0;
-                hoverTimer        = 0f;
-                HoverProgress     = 0f;
-                HoverInZone       = false;
-                IsHoverTask       = false;
-                landingReceived   = false;
-                _checkpointPassed = false;
-
-                if (level2Checkpoints != null)
-                    foreach (var r in level2Checkpoints)
-                        if (r != null) r.gameObject.SetActive(false);
-
-                if (rescueNPCs != null)
-                    foreach (var npc in rescueNPCs)
-                        if (npc != null) npc.Unboard();
-
-                // Restart course from beginning on crash
-                if (_activeCourse != null && tasks[0].kind == TaskDef.Kind.CourseRun)
-                {
-                    TimeRemaining = timeLimit;
-                    driver?.ResetToSpawnPoint();
-                    StartCourseRun();
-                }
-
-                RefreshInstruction();
-                UpdateNavigationTarget();
-                return;
+                TimeRemaining = timeLimit;
+                StartCourseRun();
             }
+
+            RefreshInstruction();
+            UpdateNavigationTarget();
+        }
+
+        void OnLanding(LandingResult result)
+        {
+            if (CurrentPhase != Phase.Running) return;
+            if (!result.success) return;
 
             if (tasks[taskIdx].kind == TaskDef.Kind.Land)
                 landingReceived = true;
@@ -665,6 +674,8 @@ namespace SimCore
             UnsubscribeFromCurrentCourseRing();
             if (landingChecker != null)
                 landingChecker.OnLanding -= OnLanding;
+            if (_crashHandler != null)
+                _crashHandler.OnCrashReset -= HandleCrashReset;
         }
     }
 }

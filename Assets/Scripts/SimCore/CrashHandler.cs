@@ -17,6 +17,8 @@ namespace SimCore
         private GUIStyle niceStyle;
         private Texture2D overlayTexture;
 
+        public event System.Action OnCrashReset;
+
         private float overlayAlpha     = 0f;
         private float niceLandingAlpha = 0f;
         private bool  showCrashText    = false;
@@ -68,6 +70,7 @@ namespace SimCore
             var driver = GetComponent<SimulatorDriver>();
             if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
 
+            OnCrashReset?.Invoke();  // mission state resets here, before teleport
             if (rb != null) rb.isKinematic = false;
             driver?.ResetToSpawnPoint();
             showCrashText = false;
