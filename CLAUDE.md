@@ -29,3 +29,17 @@ When adding a new string:
 String table name: `"UI"` (Assets/Localization/)
 Keys follow dot-notation: `category.name` (e.g. `menu.quit`, `instr.land`, `hud.in_zone`)
 
+### First-time setup (required once per machine / fresh clone)
+
+The `Assets/Localization/` folder and its contents are generated assets — not committed to git.
+After cloning or if you see `SelectedLocale is null` errors:
+
+1. In the Unity Editor, run **Window → SuperHeli → Setup Localization Tables**
+   This creates `LocalizationSettings`, the English locale, and the "UI" string table.
+2. Verify in **Window → Asset Management → Localization Settings** that English appears
+   under *Available Locales* and is selected as the active locale.
+3. Press Play — strings should resolve correctly.
+
+`Loc.Get()` falls back to returning the raw key if the locale isn't ready,
+so the game remains functional even without localization set up.
+

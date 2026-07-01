@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.Localization;
 using UnityEngine;
 using UnityEngine.Localization;
+using UnityEngine.Localization.Settings;
 using UnityEngine.Localization.Tables;
 
 public static class LocalizationSetup
@@ -10,6 +11,7 @@ public static class LocalizationSetup
     const string TableName  = "UI";
     const string AssetDir   = "Assets/Localization";
     const string LocaleDir  = "Assets/Localization/Locales";
+    const string SettingsPath = "Assets/Localization/LocalizationSettings.asset";
 
     static readonly Dictionary<string, string> EnglishStrings = new Dictionary<string, string>
     {
@@ -68,7 +70,17 @@ public static class LocalizationSetup
     {
         System.IO.Directory.CreateDirectory(LocaleDir);
 
-        // Create or find English locale
+        // 1. Ensure LocalizationSettings asset exists
+        var settings = LocalizationEditorSettings.ActiveLocalizationSettings;
+        if (settings == null)
+        {
+            settings = ScriptableObject.CreateInstance<LocalizationSettings>();
+            AssetDatabase.CreateAsset(settings, SettingsPath);
+            LocalizationEditorSettings.ActiveLocalizationSettings = settings;
+            Debug.Log("[LocalizationSetup] Created LocalizationSettings asset.");
+        }
+
+        // 2. Create or find English locale
         var locale = LocalizationEditorSettings.GetLocale(SystemLanguage.English);
         if (locale == null)
         {
@@ -78,7 +90,7 @@ public static class LocalizationSetup
             Debug.Log("[LocalizationSetup] Created English locale.");
         }
 
-        // Create or find the "UI" string table collection
+        // 3. Create or find the "UI" string table collection
         var collection = LocalizationEditorSettings.GetStringTableCollection(TableName);
         if (collection == null)
         {
@@ -94,6 +106,7 @@ public static class LocalizationSetup
             Debug.Log("[LocalizationSetup] Added English table to existing collection.");
         }
 
+        // 4. Add any missing entries (does not overwrite existing translations)
         foreach (var kv in EnglishStrings)
         {
             if (table.GetEntry(kv.Key) == null)
@@ -105,5 +118,12 @@ public static class LocalizationSetup
         AssetDatabase.SaveAssets();
 
         Debug.Log($"[LocalizationSetup] Done — {EnglishStrings.Count} entries in '{TableName}' (English).");
+        EditorUtility.DisplayDialog("SuperHeli Localization",
+            $"Setup complete!\n\n" +
+            $"• LocalizationSettings: {SettingsPath}\n" +
+            $"• Locale: English\n" +
+            $"• Table: '{TableName}' ({EnglishStrings.Count} entries)\n\n" +
+            "Open Window → Asset Management → Localization Settings to verify.",
+            "OK");
     }
 }
