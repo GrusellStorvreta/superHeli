@@ -4,11 +4,13 @@ namespace SimCore
 {
     public class SnowWashEffect : MonoBehaviour
     {
-        [Header("Terrain")]
-        [Tooltip("Terrain layer index that counts as snow (check your Terrain's Paint Texture layers)")]
-        public int   snowLayerIndex = 0;
+        [Header("Terrain — snow detection")]
+        [Tooltip("Substring to match against terrain layer names (case-insensitive). Leave empty to use Snow Layer Index instead.")]
+        public string snowLayerName  = "snow";
+        [Tooltip("Fallback layer index if name matching finds nothing")]
+        public int    snowLayerIndex = 0;
         [Tooltip("Minimum snow blend value (0–1) to enable the effect")]
-        public float snowThreshold  = 0.3f;
+        public float  snowThreshold  = 0.3f;
 
         [Header("Rotor wash — continuous near ground")]
         public float maxAglM         = 8f;
@@ -23,6 +25,7 @@ namespace SimCore
         private ParticleSystem  _ps;
         private SimulatorDriver _driver;
         private LandingChecker  _landingChecker;
+        private int             _resolvedLayerIndex = -1; // -1 = not yet resolved
 
         void Start()
         {
@@ -56,19 +59,10 @@ namespace SimCore
 
         void Update()
         {
-            if (_ps == null || _driver == null)
-            {
-                SetEmission(0f);
-                return;
-            }
+            if (_ps == null || _driver == null) { SetEmission(0f); return; }
 
             Vector3 pos = _driver.LastBodyPosition;
-
-            if (!IsOverSnow(pos))
-            {
-                SetEmission(0f);
-                return;
-            }
+            if (!IsOverSnow(pos)) { SetEmission(0f); return; }
 
             float aglM = maxAglM + 1f;
             if (Physics.Raycast(pos, Vector3.down, out RaycastHit hit, maxAglM + 50f))
@@ -84,14 +78,42 @@ namespace SimCore
             if (terrain == null) return false;
 
             TerrainData td = terrain.terrainData;
-            if (snowLayerIndex >= td.alphamapLayers) return false;
+
+            // Resolve layer index once (or retry each call if terrain regenerates)
+            int layerIdx = ResolveSnowLayer(td);
+            if (layerIdx < 0 || layerIdx >= td.alphamapLayers) return false;
 
             Vector3 tp   = worldPos - terrain.transform.position;
             int mapX = Mathf.Clamp((int)(tp.x / td.size.x * td.alphamapWidth),  0, td.alphamapWidth  - 1);
             int mapZ = Mathf.Clamp((int)(tp.z / td.size.z * td.alphamapHeight), 0, td.alphamapHeight - 1);
 
             float[,,] alphas = td.GetAlphamaps(mapX, mapZ, 1, 1);
-            return alphas[0, 0, snowLayerIndex] > snowThreshold;
+            return alphas[0, 0, layerIdx] > snowThreshold;
+        }
+
+        int ResolveSnowLayer(TerrainData td)
+        {
+            // Return cached result if already found
+            if (_resolvedLayerIndex >= 0) return _resolvedLayerIndex;
+
+            if (!string.IsNullOrEmpty(snowLayerName))
+            {
+                var layers = td.terrainLayers;
+                for (int i = 0; i < layers.Length; i++)
+                {
+                    if (layers[i] != null &&
+                        layers[i].name.IndexOf(snowLayerName, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        _resolvedLayerIndex = i;
+                        Debug.Log($"[SnowWashEffect] Found snow layer '{layers[i].name}' at index {i}");
+                        return i;
+                    }
+                }
+                Debug.LogWarning($"[SnowWashEffect] No terrain layer matching '{snowLayerName}' found — falling back to index {snowLayerIndex}");
+            }
+
+            _resolvedLayerIndex = snowLayerIndex;
+            return _resolvedLayerIndex;
         }
 
         void SetEmission(float rate)
