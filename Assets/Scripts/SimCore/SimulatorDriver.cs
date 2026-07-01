@@ -57,6 +57,7 @@ namespace SimCore
             rb.drag = 0f;
             rb.angularDrag = 0f;
             rb.useGravity = true;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
 
             if (spawnPoint == null)
                 spawnPoint = GameObject.Find("SpawnPoint")?.transform;
@@ -207,7 +208,7 @@ namespace SimCore
             double dt = Time.fixedDeltaTime;
             simulator.UpdateActuators(controlEntityId, dt);
 
-            Vector3 force  = simulator.ComputeForce(controlEntityId, rb.rotation, rb.velocity);
+            Vector3 force  = simulator.ComputeForce(controlEntityId, rb.rotation, rb.velocity, rb.position.y);
             Vector3 torque = simulator.ComputeTorque(controlEntityId, rb.rotation, rb.angularVelocity);
 
             rb.AddForce(force);

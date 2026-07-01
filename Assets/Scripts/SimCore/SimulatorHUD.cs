@@ -22,6 +22,7 @@ namespace SimCore
         private const int   GimbalTexSize  = 140;
         private const int   GimbalOuterR   = 62;
         private const int   GimbalInnerR   = 7;
+        private const int   GimbalMidR     = 10; // ~14.5° — cruise/top speed tilt reference
         private const float GimbalDispSize = 140f;
         private const int   DotTexSize     = 9;
         private const float DotDispSize    = 9f;
@@ -45,7 +46,7 @@ namespace SimCore
             };
             labelStyle.normal.textColor = amber;
 
-            gimbalBgTexture = MakeGimbalTexture(GimbalTexSize, GimbalOuterR, GimbalInnerR, amber);
+            gimbalBgTexture = MakeGimbalTexture(GimbalTexSize, GimbalOuterR, GimbalInnerR, GimbalMidR, amber);
             dotTexture      = MakeDotTexture(DotTexSize, amber);
         }
 
@@ -127,13 +128,12 @@ namespace SimCore
             return t;
         }
 
-        private static Texture2D MakeGimbalTexture(int size, int outerR, int innerR, Color col)
+        private static Texture2D MakeGimbalTexture(int size, int outerR, int innerR, int midR, Color col)
         {
             var t = new Texture2D(size, size, TextureFormat.RGBA32, false);
             var pixels = new Color[size * size];
             float cx = size * 0.5f;
             float cy = size * 0.5f;
-            int midR = outerR / 2; // mid-range reference ring
 
             for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)

@@ -91,6 +91,7 @@ namespace SimCore
 
         private Dictionary<int, Action> _levelBuilders;
         private LevelEnvironment        _environment;
+        private bool                    _initializedExternally;
         private int                     taskIdx;
         private float                   hoverTimer;
         private Vector3                 hoverAnchor;
@@ -108,6 +109,7 @@ namespace SimCore
 
         void Start()
         {
+            if (_initializedExternally) return; // Initialize() already called — skip to avoid double-init
             if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
             landingChecker = FindObjectOfType<LandingChecker>();
             if (landingChecker != null) landingChecker.OnLanding += OnLanding;
@@ -117,6 +119,7 @@ namespace SimCore
 
         public void Initialize(int level)
         {
+            _initializedExternally = true;
             defaultLevelNumber = level;
             if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
             if (landingChecker == null)
@@ -222,10 +225,11 @@ namespace SimCore
             timeLimit     = course.timeLimit;
             _activeCourse = course;
 
+            int ringCount = course.rings?.Length ?? 0;
             tasks = new TaskDef[]
             {
                 new TaskDef { kind = TaskDef.Kind.CourseRun,
-                              instruction = $"Fly through all {course.rings.Length} checkpoints!" },
+                              instruction = $"Fly through all {ringCount} checkpoints!" },
                 new TaskDef { kind = TaskDef.Kind.Land,
                               instruction = "Land the helicopter" },
             };
@@ -263,8 +267,9 @@ namespace SimCore
 
         void StartCourseRun()
         {
-            if (_activeCourse == null) return;
+            if (_activeCourse == null || _activeCourse.rings == null) return;
 
+            UnsubscribeFromCurrentCourseRing();
             _courseRingIdx  = 0;
             _courseComplete = false;
 
@@ -278,14 +283,15 @@ namespace SimCore
 
         void ShowCourseWindow()
         {
-            if (_activeCourse == null) return;
+            if (_activeCourse == null || _activeCourse.rings == null) return;
             int end = Mathf.Min(_courseRingIdx + _activeCourse.visibleAhead, _activeCourse.rings.Length);
             for (int i = _courseRingIdx; i < end; i++)
-                if (_activeCourse.rings[i] != null)
-                {
-                    _activeCourse.rings[i].ResetRing();
-                    _activeCourse.rings[i].gameObject.SetActive(true);
-                }
+            {
+                var r = _activeCourse.rings[i];
+                if (r == null) continue;
+                r.gameObject.SetActive(true); // SetActive first so Awake() runs before ResetRing
+                r.ResetRing();
+            }
         }
 
         void SubscribeToCurrentCourseRing()
@@ -574,7 +580,11 @@ namespace SimCore
 
                 // Restart course from beginning on crash
                 if (_activeCourse != null && tasks[0].kind == TaskDef.Kind.CourseRun)
+                {
+                    TimeRemaining = timeLimit;
+                    driver?.ResetToSpawnPoint();
                     StartCourseRun();
+                }
 
                 RefreshInstruction();
                 UpdateNavigationTarget();

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -25,9 +26,12 @@ namespace SimCore
 
         private readonly MenuTheme _theme = new MenuTheme();
 
-        private int ButtonCount => _menuPhase == MenuPhase.Main       ? 4
-                                 : _menuPhase == MenuPhase.Settings   ? 2
-                                 : 4;
+        private List<(int num, string name)> _levelList;
+
+        private int LevelSelectButtonCount => (_levelList?.Count ?? 3) + 1; // levels + back
+        private int ButtonCount => _menuPhase == MenuPhase.Main     ? 4
+                                 : _menuPhase == MenuPhase.Settings ? 2
+                                 : LevelSelectButtonCount;
 
         public void ShowMenu()
         {
@@ -38,7 +42,34 @@ namespace SimCore
         void Start()
         {
             GameSettings.ApplyAudioSettings();
+            BuildLevelList();
             EnterMenu();
+        }
+
+        void BuildLevelList()
+        {
+            _levelList = new List<(int, string)>
+            {
+                (1, "LEVEL 1"),
+                (2, "LEVEL 2"),
+            };
+
+            if (missionManager != null && missionManager.courses != null)
+                foreach (var c in missionManager.courses)
+                    if (c != null)
+                        _levelList.Add((c.levelNumber, c.courseName.ToUpper()));
+
+            _levelList.Add((7, "LEVEL 7"));
+            _levelList.Sort((a, b) => a.num.CompareTo(b.num));
+        }
+
+        static void QuitGame()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         void Update()
@@ -72,15 +103,15 @@ namespace SimCore
                 if (_selectedIndex == 0) StartGame(GameSettings.Mode.FreeFlight);
                 if (_selectedIndex == 1) { _menuPhase = MenuPhase.LevelSelect; _selectedIndex = 0; }
                 if (_selectedIndex == 2) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
-                if (_selectedIndex == 3) Application.Quit();
+                if (_selectedIndex == 3) QuitGame();
             }
             else if (_menuPhase == MenuPhase.LevelSelect)
             {
-                int u = GameSettings.UnlockedLevels;
-                if (_selectedIndex == 0)           StartGame(GameSettings.Mode.Mission, 1);
-                if (_selectedIndex == 1 && u >= 2) StartGame(GameSettings.Mode.Mission, 2);
-                if (_selectedIndex == 2 && u >= 7) StartGame(GameSettings.Mode.Mission, 7);
-                if (_selectedIndex == 3)           GoBack();
+                int u    = GameSettings.UnlockedLevels;
+                int back = _levelList.Count;
+                if (_selectedIndex == back) { GoBack(); return; }
+                var lvl = _levelList[_selectedIndex];
+                if (u >= lvl.num) StartGame(GameSettings.Mode.Mission, lvl.num);
             }
             else if (_menuPhase == MenuPhase.Settings)
             {
@@ -152,9 +183,10 @@ namespace SimCore
             _theme.DrawOverlay();
 
             float panW = 380f;
+            float gap  = 68f;
             float panH = _menuPhase == MenuPhase.Main     ? 460f
                        : _menuPhase == MenuPhase.Settings ? 340f
-                       : 430f;
+                       : 140f + gap * LevelSelectButtonCount + 30f;
             float px = (sw - panW) * 0.5f;
             float py = (sh - panH) * 0.5f;
 
@@ -168,22 +200,27 @@ namespace SimCore
             float btnH = 56f;
             float bx   = px + (panW - btnW) * 0.5f;
             float by   = py + 140f;
-            float gap  = 68f;
 
             if (_menuPhase == MenuPhase.Main)
             {
                 if (_theme.DrawButton(new Rect(bx, by,           btnW, btnH), "FREE FLIGHT",  _selectedIndex == 0)) StartGame(GameSettings.Mode.FreeFlight);
                 if (_theme.DrawButton(new Rect(bx, by + gap,     btnW, btnH), "MISSION MODE", _selectedIndex == 1)) { _menuPhase = MenuPhase.LevelSelect; _selectedIndex = 0; }
                 if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), "SETTINGS",     _selectedIndex == 2)) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
-                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), "QUIT",         _selectedIndex == 3)) Application.Quit();
+                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), "QUIT",         _selectedIndex == 3)) QuitGame();
             }
             else if (_menuPhase == MenuPhase.LevelSelect)
             {
                 int u = GameSettings.UnlockedLevels;
-                if (_theme.DrawButton(new Rect(bx, by,           btnW, btnH), "LEVEL 1",                    _selectedIndex == 0))         StartGame(GameSettings.Mode.Mission, 1);
-                if (_theme.DrawButton(new Rect(bx, by + gap,     btnW, btnH), u >= 2 ? "LEVEL 2" : "LEVEL 2  \U0001F512", _selectedIndex == 1, u < 2)) StartGame(GameSettings.Mode.Mission, 2);
-                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), u >= 7 ? "LEVEL 7" : "LEVEL 7  \U0001F512", _selectedIndex == 2, u < 7)) StartGame(GameSettings.Mode.Mission, 7);
-                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), "← BACK",                    _selectedIndex == 3))         GoBack();
+                for (int i = 0; i < _levelList.Count; i++)
+                {
+                    var lvl    = _levelList[i];
+                    bool locked = u < lvl.num;
+                    string lbl  = locked ? $"{lvl.name}  \U0001F512" : lvl.name;
+                    if (_theme.DrawButton(new Rect(bx, by + gap * i, btnW, btnH), lbl, _selectedIndex == i, locked))
+                        if (!locked) StartGame(GameSettings.Mode.Mission, lvl.num);
+                }
+                if (_theme.DrawButton(new Rect(bx, by + gap * _levelList.Count, btnW, btnH), "← BACK", _selectedIndex == _levelList.Count))
+                    GoBack();
             }
             else // Settings
             {

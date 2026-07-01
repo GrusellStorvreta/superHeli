@@ -9,7 +9,7 @@ namespace SimCore
     {
         public float mass = 1000f;
         public float maxLift = 19620f;   // N at collective=1.0; hover at collective=0.5
-        public float linearDrag = 150f;  // N·s/m applied as force
+        public float linearDrag = 60f;    // N·s/m horizontal drag — tuned for ~130 kt cruise
         public float angularDrag = 2.5f; // s⁻¹ applied as angular acceleration opposing ω
         public float cyclicTorque = 60f; // deg/s² per unit cyclic input
         public float pedalTorque = 80f;  // deg/s² per unit pedal input
@@ -17,6 +17,12 @@ namespace SimCore
         public double tau_collective = 0.25;
         public double tau_cyclic = 0.15;
         public double tau_pedal = 0.12;
+
+        public float ceilingStartY = 980f;  // lift begins tapering here
+        public float ceilingMaxY   = 1000f; // lift reaches zero here
+
+        public float verticalDrag  = 100f; // extra drag on Y axis only — limits climb rate
+                                            // to ~1700 ft/min without affecting horizontal performance
     }
 
     [Serializable]
@@ -102,15 +108,28 @@ namespace SimCore
             cs.applied.pedal      += aP  * (cs.target.pedal       - cs.applied.pedal);
         }
 
+        // Smooth lift multiplier: 1.0 below ceilingStart, falls to 0 at ceilingMax.
+        static float LiftCeilingFactor(float start, float max, float y)
+        {
+            if (y <= start) return 1f;
+            if (y >= max)   return 0f;
+            float t = (y - start) / (max - start);
+            return 1f - t * t; // quadratic ease-out — feels like air getting thin
+        }
+
         // Net force to apply via Rigidbody.AddForce (lift + drag). Unity handles gravity separately.
-        public Vector3 ComputeForce(string entityId, Quaternion rotation, Vector3 velocity)
+        public Vector3 ComputeForce(string entityId, Quaternion rotation, Vector3 velocity,
+                                    float currentAltitude = 0f)
         {
             if (string.IsNullOrEmpty(entityId)) entityId = _defaultEntityId;
             if (!_controls.TryGetValue(entityId, out var cs)) return Vector3.zero;
 
             var a = cs.applied;
-            Vector3 lift = (rotation * Vector3.up) * ((float)a.collective * _cfg.maxLift);
+            float liftFactor = LiftCeilingFactor(_cfg.ceilingStartY, _cfg.ceilingMaxY,
+                                                 currentAltitude);
+            Vector3 lift = (rotation * Vector3.up) * ((float)a.collective * _cfg.maxLift * liftFactor);
             Vector3 drag = -velocity * _cfg.linearDrag;
+            drag.y -= velocity.y * _cfg.verticalDrag;
             return lift + drag;
         }
 
