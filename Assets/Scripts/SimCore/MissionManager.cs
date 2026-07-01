@@ -532,6 +532,15 @@ namespace SimCore
             hoverTimer      = 0f;
             HoverProgress   = 0f;
             landingReceived = false;
+
+            // If the player landed cleanly during the course-complete pause (before the task
+            // switched to Land), count it — the helicopter is already on the ground and
+            // OnCollisionEnter won't fire again.
+            if (next.kind == TaskDef.Kind.Land &&
+                landingChecker != null &&
+                landingChecker.LastResult.success)
+                landingReceived = true;
+
             if (next.taskTimeLimit > 0) TimeRemaining = next.taskTimeLimit;
             RefreshInstruction();
             UpdateNavigationTarget();
@@ -655,8 +664,8 @@ namespace SimCore
             {
                 int total = _activeCourse.rings.Length;
                 CurrentInstruction = _courseComplete
-                    ? "Great flying!  Now land the helicopter"
-                    : $"Checkpoint  {_courseRingIdx + 1} / {total}";
+                    ? Loc.Get("instr.course_complete")
+                    : Loc.Get("instr.checkpoint_progress", _courseRingIdx + 1, total);
             }
             else
             {

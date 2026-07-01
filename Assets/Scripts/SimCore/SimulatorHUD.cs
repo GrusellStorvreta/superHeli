@@ -27,8 +27,6 @@ namespace SimCore
         private const int   DotTexSize     = 9;
         private const float DotDispSize    = 9f;
 
-        void OnEnable() => BuildStyles();
-
         void BuildStyles()
         {
             bgTexture = MakeFillTexture(new Color(0.04f, 0.06f, 0.1f, 0.82f));

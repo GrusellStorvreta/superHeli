@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.InputSystem;
 
 public class CameraLook : MonoBehaviour
@@ -12,11 +13,17 @@ public class CameraLook : MonoBehaviour
     public Camera[] cameras;
     private int activeCameraIndex = 0;
 
+    public bool IsInterior => activeCameraIndex != 1;
+
     [Header("Audio")]
     [Tooltip("Played when Follow Camera (exterior) is active.")]
     public AudioSource exteriorAudio;
     [Tooltip("Played when Cockpit or Look Down (interior) is active.")]
     public AudioSource interiorAudio;
+
+    [Header("Audio Mixer Snapshots")]
+    public AudioMixerSnapshot interiorSnapshot;
+    public AudioMixerSnapshot exteriorSnapshot;
 
     private float yaw = 0f;
     private float pitch = 10f;
@@ -130,7 +137,16 @@ public class CameraLook : MonoBehaviour
     {
         // cameras[1] = Follow Camera = exterior; all others (FPV, LookDown) = interior
         bool exterior = activeCameraIndex == 1;
-        if (exteriorAudio != null) exteriorAudio.mute = !exterior;
-        if (interiorAudio != null) interiorAudio.mute =  exterior;
+
+        if (interiorSnapshot != null && exteriorSnapshot != null)
+        {
+            (exterior ? exteriorSnapshot : interiorSnapshot).TransitionTo(0f);
+        }
+        else
+        {
+            // Fallback if mixer not yet configured
+            if (exteriorAudio != null) exteriorAudio.mute = !exterior;
+            if (interiorAudio != null) interiorAudio.mute =  exterior;
+        }
     }
 }

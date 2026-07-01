@@ -16,8 +16,6 @@ namespace SimCore
         private static readonly Color Amber     = new Color(1f, 0.78f, 0.08f);
         private static readonly Color DarkPanel = new Color(0.04f, 0.06f, 0.1f, 0.82f);
 
-        void OnEnable() => BuildStyles();
-
         void BuildStyles()
         {
             bgTex     = MakeTex(DarkPanel);

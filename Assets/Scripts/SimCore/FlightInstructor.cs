@@ -16,7 +16,8 @@ namespace SimCore
     public class FlightInstructor : MonoBehaviour
     {
         [Header("References")]
-        public Animator animator;
+        public Animator      animator;
+        public SpeechPlayer  speech;
 
         [Header("Clip Lengths (seconds) — match your actual clips")]
         public float headSlapLength = 2.0f;
@@ -84,8 +85,10 @@ namespace SimCore
 
         void OnLanding(LandingResult result)
         {
-            if (result.success && Random.value < clappingChanceLanding)
+            if (!result.success) return;
+            if (Random.value < clappingChanceLanding)
                 PlayClapping();
+            speech?.Say("landing.success");
         }
 
         void OnMissionSuccess()
