@@ -73,7 +73,7 @@ namespace SimCore
 
             // Attitude (normalize euler to -180..180)
             Vector3 euler = rot.eulerAngles;
-            float pitch = euler.x > 180f ? -(360f - euler.x) : -euler.x; // + = nose up on display
+            float pitch = euler.x > 180f ? (360f - euler.x) : -euler.x; // + = nose up on display
             float roll  = euler.z > 180f ? -(360f - euler.z) :  euler.z; // + = right on display
             pitch = Mathf.Clamp(pitch, -MaxTilt, MaxTilt);
             roll  = Mathf.Clamp(roll,  -MaxTilt, MaxTilt);
