@@ -34,13 +34,25 @@ namespace SimCore
         // -------------------------------------------------------
 
         [Serializable]
+        public class CourseWaypoint
+        {
+            public enum Kind { Checkpoint, HoverBox }
+            public Kind           kind         = Kind.Checkpoint;
+            public CheckpointRing ring;                               // if Checkpoint
+            public Transform      boxCenter;                          // if HoverBox
+            public Vector3        boxSize      = new Vector3(20f, 15f, 20f);
+            public float          holdDuration = 5f;
+            public GameObject     boxVisual;                          // optional scene object to show/hide
+        }
+
+        [Serializable]
         public class CheckpointCourse
         {
-            public string          courseName;
-            public int             levelNumber;
-            public CheckpointRing[] rings;
-            public float           timeLimit    = 90f;
-            public int             visibleAhead = 3;
+            public string           courseName;
+            public int              levelNumber;
+            public CourseWaypoint[] waypoints;
+            public float            timeLimit    = 90f;
+            public int              visibleAhead = 3;
         }
 
         // -------------------------------------------------------
@@ -106,9 +118,13 @@ namespace SimCore
 
         // Course run state
         private CheckpointCourse _activeCourse;
-        private int               _courseRingIdx;
+        private int               _courseWaypointIdx;
         private bool              _courseComplete;
         private float             _completionPauseTimer;
+
+        CourseWaypoint CurrentWaypoint =>
+            _activeCourse != null && _courseWaypointIdx < _activeCourse.waypoints.Length
+                ? _activeCourse.waypoints[_courseWaypointIdx] : null;
 
         private CrashHandler _crashHandler;
 
@@ -239,11 +255,11 @@ namespace SimCore
             timeLimit     = course.timeLimit;
             _activeCourse = course;
 
-            int ringCount = course.rings?.Length ?? 0;
+            int waypointCount = course.waypoints?.Length ?? 0;
             tasks = new TaskDef[]
             {
                 new TaskDef { kind = TaskDef.Kind.CourseRun,
-                              instruction = Loc.Get("instr.course", ringCount) },
+                              instruction = Loc.Get("instr.course", waypointCount) },
                 new TaskDef { kind = TaskDef.Kind.Land,
                               instruction = Loc.Get("instr.land") },
             };
@@ -281,58 +297,91 @@ namespace SimCore
 
         void StartCourseRun()
         {
-            if (_activeCourse == null || _activeCourse.rings == null) return;
+            if (_activeCourse?.waypoints == null) return;
 
-            UnsubscribeFromCurrentCourseRing();
-            _courseRingIdx  = 0;
-            _courseComplete = false;
+            UnsubscribeFromCurrentCourseWaypoint();
+            _courseWaypointIdx = 0;
+            _courseComplete    = false;
+            IsHoverTask        = false;
+            hoverTimer         = 0f;
+            HoverProgress      = 0f;
 
-            foreach (var r in _activeCourse.rings)
-                if (r != null) r.gameObject.SetActive(false);
+            foreach (var wp in _activeCourse.waypoints)
+            {
+                wp.ring?.gameObject.SetActive(false);
+                if (wp.boxVisual != null) wp.boxVisual.SetActive(false);
+            }
 
-            ShowCourseWindow();
-            SubscribeToCurrentCourseRing();
+            SetupCurrentWaypoint();
             RefreshInstruction();
         }
 
-        void ShowCourseWindow()
+        void SetupCurrentWaypoint()
         {
-            if (_activeCourse == null || _activeCourse.rings == null) return;
-            int end = Mathf.Min(_courseRingIdx + _activeCourse.visibleAhead, _activeCourse.rings.Length);
-            for (int i = _courseRingIdx; i < end; i++)
+            var wp = CurrentWaypoint;
+            if (wp == null) return;
+
+            if (wp.kind == CourseWaypoint.Kind.Checkpoint)
             {
-                var r = _activeCourse.rings[i];
-                if (r == null) continue;
-                r.gameObject.SetActive(true); // SetActive first so Awake() runs before ResetRing
-                r.ResetRing();
+                ShowCheckpointWindow();
+                SubscribeToCurrentCourseWaypoint();
+            }
+            else
+            {
+                if (wp.boxVisual != null) wp.boxVisual.SetActive(true);
+                hoverTimer    = 0f;
+                HoverProgress = 0f;
+            }
+            UpdateNavigationTarget();
+        }
+
+        void ShowCheckpointWindow()
+        {
+            int shown = 0;
+            for (int i = _courseWaypointIdx; i < _activeCourse.waypoints.Length && shown < _activeCourse.visibleAhead; i++)
+            {
+                var wp = _activeCourse.waypoints[i];
+                if (wp.kind != CourseWaypoint.Kind.Checkpoint) break;
+                if (wp.ring == null) continue;
+                wp.ring.gameObject.SetActive(true);
+                wp.ring.ResetRing();
+                shown++;
             }
         }
 
-        void SubscribeToCurrentCourseRing()
+        void SubscribeToCurrentCourseWaypoint()
         {
-            if (_activeCourse == null || _courseRingIdx >= _activeCourse.rings.Length) return;
-            var ring = _activeCourse.rings[_courseRingIdx];
-            if (ring != null) ring.OnPassedThrough += OnCourseRingPassed;
+            var wp = CurrentWaypoint;
+            if (wp?.kind == CourseWaypoint.Kind.Checkpoint && wp.ring != null)
+                wp.ring.OnPassedThrough += AdvanceCourseWaypoint;
         }
 
-        void UnsubscribeFromCurrentCourseRing()
+        void UnsubscribeFromCurrentCourseWaypoint()
         {
-            if (_activeCourse == null || _courseRingIdx >= _activeCourse.rings.Length) return;
-            var ring = _activeCourse.rings[_courseRingIdx];
-            if (ring != null) ring.OnPassedThrough -= OnCourseRingPassed;
+            var wp = CurrentWaypoint;
+            if (wp?.kind == CourseWaypoint.Kind.Checkpoint && wp.ring != null)
+                wp.ring.OnPassedThrough -= AdvanceCourseWaypoint;
         }
 
-        void OnCourseRingPassed()
+        void AdvanceCourseWaypoint()
         {
-            if (_activeCourse == null) return;
+            var wp = CurrentWaypoint;
+            if (wp != null)
+            {
+                if (wp.kind == CourseWaypoint.Kind.Checkpoint)
+                    wp.ring?.gameObject.SetActive(false);
+                else
+                    if (wp.boxVisual != null) wp.boxVisual.SetActive(false);
 
-            // Hide the ring just passed
-            _activeCourse.rings[_courseRingIdx]?.gameObject.SetActive(false);
+                IsHoverTask   = false;
+                hoverTimer    = 0f;
+                HoverProgress = 0f;
+            }
 
-            _courseRingIdx++;
+            _courseWaypointIdx++;
             OnCheckpointPassed?.Invoke();
 
-            if (_courseRingIdx >= _activeCourse.rings.Length)
+            if (_courseWaypointIdx >= _activeCourse.waypoints.Length)
             {
                 _courseComplete       = true;
                 _completionPauseTimer = 2.5f;
@@ -340,17 +389,56 @@ namespace SimCore
                 return;
             }
 
-            // Reveal the next ring at the far end of the window
-            int newTail = _courseRingIdx + _activeCourse.visibleAhead - 1;
-            if (newTail < _activeCourse.rings.Length && _activeCourse.rings[newTail] != null)
+            // Reveal next ring in sliding window for consecutive checkpoints
+            if (CurrentWaypoint?.kind == CourseWaypoint.Kind.Checkpoint)
             {
-                _activeCourse.rings[newTail].ResetRing();
-                _activeCourse.rings[newTail].gameObject.SetActive(true);
+                int tail = _courseWaypointIdx + _activeCourse.visibleAhead - 1;
+                if (tail < _activeCourse.waypoints.Length)
+                {
+                    var tailWp = _activeCourse.waypoints[tail];
+                    if (tailWp.kind == CourseWaypoint.Kind.Checkpoint && tailWp.ring != null)
+                    {
+                        tailWp.ring.gameObject.SetActive(true);
+                        tailWp.ring.ResetRing();
+                    }
+                }
+                SubscribeToCurrentCourseWaypoint();
+            }
+            else
+            {
+                SetupCurrentWaypoint();
             }
 
-            SubscribeToCurrentCourseRing();
             RefreshInstruction();
             UpdateNavigationTarget();
+        }
+
+        void EvaluateCourseHover(Vector3 pos)
+        {
+            var wp = CurrentWaypoint;
+            if (wp?.boxCenter == null) return;
+
+            IsHoverTask = true;
+            Vector3 local = pos - wp.boxCenter.position;
+            HoverInZone = Mathf.Abs(local.x) < wp.boxSize.x * 0.5f &&
+                          Mathf.Abs(local.y) < wp.boxSize.y * 0.5f &&
+                          Mathf.Abs(local.z) < wp.boxSize.z * 0.5f;
+
+            if (HoverInZone)
+            {
+                hoverTimer    += Time.deltaTime;
+                HoverProgress  = Mathf.Clamp01(hoverTimer / wp.holdDuration);
+                if (hoverTimer >= wp.holdDuration)
+                {
+                    OnHoverTaskComplete?.Invoke();
+                    AdvanceCourseWaypoint();
+                }
+            }
+            else
+            {
+                hoverTimer    = 0f;
+                HoverProgress = 0f;
+            }
         }
 
         // -------------------------------------------------------
@@ -454,6 +542,10 @@ namespace SimCore
                         _completionPauseTimer -= Time.deltaTime;
                         if (_completionPauseTimer <= 0f)
                             AdvanceTask(pos);
+                    }
+                    else if (CurrentWaypoint?.kind == CourseWaypoint.Kind.HoverBox)
+                    {
+                        EvaluateCourseHover(pos);
                     }
                     break;
 
@@ -566,8 +658,11 @@ namespace SimCore
                         ? (Vector3?)t.checkpoint.transform.position : null;
                     break;
                 case TaskDef.Kind.CourseRun:
-                    NavigationTarget = _activeCourse != null && _courseRingIdx < _activeCourse.rings.Length
-                        ? (Vector3?)_activeCourse.rings[_courseRingIdx].transform.position : null;
+                    var cw = CurrentWaypoint;
+                    NavigationTarget = cw == null ? null
+                        : cw.kind == CourseWaypoint.Kind.Checkpoint && cw.ring != null
+                            ? (Vector3?)cw.ring.transform.position
+                            : cw.boxCenter != null ? (Vector3?)cw.boxCenter.position : null;
                     break;
                 case TaskDef.Kind.Land:
                     NavigationTarget = driver?.spawnPoint != null
@@ -586,7 +681,7 @@ namespace SimCore
             if (CurrentPhase != Phase.Running) return;
 
             UnsubscribeCurrentCheckpoint();
-            UnsubscribeFromCurrentCourseRing();
+            UnsubscribeFromCurrentCourseWaypoint();
 
             taskIdx           = 0;
             hoverTimer        = 0f;
@@ -662,10 +757,13 @@ namespace SimCore
             var t = tasks[taskIdx];
             if (t.kind == TaskDef.Kind.CourseRun && _activeCourse != null)
             {
-                int total = _activeCourse.rings.Length;
-                CurrentInstruction = _courseComplete
-                    ? Loc.Get("instr.course_complete")
-                    : Loc.Get("instr.checkpoint_progress", _courseRingIdx + 1, total);
+                if (_courseComplete)
+                    CurrentInstruction = Loc.Get("instr.course_complete");
+                else if (CurrentWaypoint?.kind == CourseWaypoint.Kind.HoverBox)
+                    CurrentInstruction = Loc.Get("instr.course_hover");
+                else
+                    CurrentInstruction = Loc.Get("instr.checkpoint_progress",
+                        _courseWaypointIdx + 1, _activeCourse.waypoints.Length);
             }
             else
             {
@@ -691,7 +789,7 @@ namespace SimCore
         void OnDestroy()
         {
             UnsubscribeCurrentCheckpoint();
-            UnsubscribeFromCurrentCourseRing();
+            UnsubscribeFromCurrentCourseWaypoint();
             if (landingChecker != null)
                 landingChecker.OnLanding -= OnLanding;
             if (_crashHandler != null)
