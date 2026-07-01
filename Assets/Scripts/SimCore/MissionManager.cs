@@ -490,7 +490,7 @@ namespace SimCore
 
             // Clean up outgoing task
             if (prev.kind == TaskDef.Kind.FlyThrough && prev.checkpoint != null)
-                prev.checkpoint.OnPassedThrough -= OnCheckpointPassed;
+                prev.checkpoint.OnPassedThrough -= OnFlyThroughPassed;
 
             if (prev.kind == TaskDef.Kind.HoverAtAGL)
                 hoverZoneMarker?.gameObject.SetActive(false);
@@ -520,7 +520,7 @@ namespace SimCore
                 next.checkpoint.gameObject.SetActive(true);
                 next.checkpoint.ResetRing();
                 _checkpointPassed = false;
-                next.checkpoint.OnPassedThrough += OnCheckpointPassed;
+                next.checkpoint.OnPassedThrough += OnFlyThroughPassed;
             }
 
             if (next.kind == TaskDef.Kind.CourseRun)
@@ -570,7 +570,7 @@ namespace SimCore
             }
         }
 
-        void OnCheckpointPassed() => _checkpointPassed = true;
+        void OnFlyThroughPassed() => _checkpointPassed = true;
 
         void HandleCrashReset()
         {
@@ -641,7 +641,7 @@ namespace SimCore
             if (tasks == null || taskIdx >= tasks.Length) return;
             var t = tasks[taskIdx];
             if (t.kind == TaskDef.Kind.FlyThrough && t.checkpoint != null)
-                t.checkpoint.OnPassedThrough -= OnCheckpointPassed;
+                t.checkpoint.OnPassedThrough -= OnFlyThroughPassed;
         }
 
         void RefreshInstruction()
