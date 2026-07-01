@@ -18,6 +18,11 @@ namespace SimCore
         [Header("References")]
         public Animator      animator;
         public SpeechPlayer  speech;
+        public Transform     lookTarget;   // assign FPV camera or player head in Inspector
+
+        [Header("Head look-at")]
+        [Range(1f, 10f)]
+        public float         lookSpeed = 4f;
 
         [Header("Clip Lengths (seconds) — match your actual clips")]
         public float headSlapLength = 2.0f;
@@ -51,6 +56,7 @@ namespace SimCore
         private float _headSlapCooldown;
         private float _talkTimer;
         private float _busyTimer;
+        private float _lookWeight;
 
         private const float MsToKts = 1.94384f;
         private const float MToFt   = 3.28084f;
@@ -68,6 +74,7 @@ namespace SimCore
             {
                 _mission.OnMissionSuccess    += OnMissionSuccess;
                 _mission.OnHoverTaskComplete += OnHoverTaskComplete;
+                _mission.OnCheckpointPassed  += OnCheckpointPassed;
             }
 
             ScheduleNextTalk();
@@ -80,6 +87,7 @@ namespace SimCore
             {
                 _mission.OnMissionSuccess    -= OnMissionSuccess;
                 _mission.OnHoverTaskComplete -= OnHoverTaskComplete;
+                _mission.OnCheckpointPassed  -= OnCheckpointPassed;
             }
         }
 
@@ -89,6 +97,11 @@ namespace SimCore
             if (Random.value < clappingChanceLanding)
                 PlayClapping();
             speech?.Say("landing.success");
+        }
+
+        void OnCheckpointPassed()
+        {
+            speech?.Say("checkpoint.passed");
         }
 
         void OnMissionSuccess()
@@ -109,6 +122,9 @@ namespace SimCore
             _headSlapCooldown -= dt;
             _talkTimer        -= dt;
             _busyTimer        -= dt;
+
+            float targetWeight = (speech != null && speech.IsSpeaking) ? 1f : 0f;
+            _lookWeight = Mathf.MoveTowards(_lookWeight, targetWeight, lookSpeed * dt);
 
             if (_driver == null) return;
 
@@ -171,6 +187,20 @@ namespace SimCore
         void ScheduleNextTalk()
         {
             _talkTimer = Random.Range(talkIntervalRange.x, talkIntervalRange.y);
+        }
+
+        void OnAnimatorIK(int layerIndex)
+        {
+            if (animator == null || lookTarget == null) return;
+
+            animator.SetLookAtWeight(
+                _lookWeight,
+                bodyWeight:  0.05f,
+                headWeight:  0.8f,
+                eyesWeight:  1.0f,
+                clampWeight: 0.5f
+            );
+            animator.SetLookAtPosition(lookTarget.position);
         }
     }
 }

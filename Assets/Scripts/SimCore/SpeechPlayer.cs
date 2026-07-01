@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace SimCore
@@ -30,10 +31,14 @@ namespace SimCore
         [Range(0f, 1f)]
         public float        maxDistortion    = 0.4f;
 
-        private AudioHighPassFilter   _highPass;
-        private AudioDistortionFilter _distortion;
-        private float[]               _samples = new float[256];
-        private Coroutine             _crackleRoutine;
+        public bool IsSpeaking { get; private set; }
+
+        private AudioHighPassFilter          _highPass;
+        private AudioDistortionFilter        _distortion;
+        private float[]                      _samples = new float[256];
+        private Coroutine                    _crackleRoutine;
+        private Coroutine                    _speakingRoutine;
+        private Dictionary<string, List<int>> _pools = new Dictionary<string, List<int>>();
 
         void Awake()
         {
@@ -65,10 +70,13 @@ namespace SimCore
             foreach (var e in entries)
             {
                 if (e.token != token || e.clips == null || e.clips.Length == 0) continue;
-                var clip = e.clips[Random.Range(0, e.clips.Length)];
+                var clip = NextClip(e);
                 if (clip == null) return;
 
                 audioSource.PlayOneShot(clip);
+
+                if (_speakingRoutine != null) StopCoroutine(_speakingRoutine);
+                _speakingRoutine = StartCoroutine(TrackSpeaking(clip.length));
 
                 if (crackleSource != null && crackles != null && crackles.Length > 0 && Random.value < 0.3f)
                 {
@@ -77,6 +85,36 @@ namespace SimCore
                 }
                 return;
             }
+        }
+
+        AudioClip NextClip(SpeechEntry e)
+        {
+            if (!_pools.TryGetValue(e.token, out var pool) || pool.Count == 0)
+                _pools[e.token] = pool = ShuffledIndices(e.clips.Length);
+
+            int idx = pool[pool.Count - 1];
+            pool.RemoveAt(pool.Count - 1);
+            return e.clips[idx];
+        }
+
+        static List<int> ShuffledIndices(int count)
+        {
+            var list = new List<int>(count);
+            for (int i = 0; i < count; i++) list.Add(i);
+            for (int i = count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                (list[i], list[j]) = (list[j], list[i]);
+            }
+            return list;
+        }
+
+        IEnumerator TrackSpeaking(float duration)
+        {
+            IsSpeaking = true;
+            yield return new WaitForSeconds(duration);
+            IsSpeaking = false;
+            _speakingRoutine = null;
         }
 
         IEnumerator PlayCrackles(float duration)
