@@ -29,7 +29,7 @@ namespace SimCore
 
         void Start()
         {
-            _ps             = GetComponent<ParticleSystem>();
+            _ps             = GetComponentInChildren<ParticleSystem>();
             _driver         = FindObjectOfType<SimulatorDriver>();
             _landingChecker = FindObjectOfType<LandingChecker>();
             if (_landingChecker != null) _landingChecker.OnLanding += OnLanding;
