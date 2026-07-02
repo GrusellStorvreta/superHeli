@@ -179,6 +179,26 @@ namespace SimCore
             IsComplete = true;
         }
 
+        [ContextMenu("Test Boarding (Editor)")]
+        void TestBoarding()
+        {
+            if (seatSven != null && svenTransform != null)
+            {
+                svenTransform.SetParent(seatSven, false);
+                svenTransform.localPosition = Vector3.zero;
+                svenTransform.localRotation = Quaternion.identity;
+            }
+            if (seatNils != null && nilsTransform != null)
+            {
+                nilsTransform.SetParent(seatNils, false);
+                nilsTransform.localPosition = Vector3.zero;
+                nilsTransform.localRotation = Quaternion.identity;
+            }
+        }
+
+        [ContextMenu("Reset Boarding (Editor)")]
+        void TestReset() => ResetBoarding();
+
         public void ResetBoarding()
         {
             StopAllCoroutines();
