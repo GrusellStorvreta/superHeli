@@ -182,6 +182,7 @@ namespace SimCore
         public void ResetBoarding()
         {
             StopAllCoroutines();
+            fader?.Clear();
 
             if (nilsTransform != null && _nilsOriginalParent != null)
             {

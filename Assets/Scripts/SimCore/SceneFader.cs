@@ -25,6 +25,13 @@ namespace SimCore
         public IEnumerator FadeToBlack()   => Fade(0f, 1f);
         public IEnumerator FadeFromBlack() => Fade(1f, 0f);
 
+        public void Clear()
+        {
+            StopAllCoroutines();
+            _group.alpha          = 0f;
+            _group.blocksRaycasts = false;
+        }
+
         IEnumerator Fade(float from, float to)
         {
             _group.alpha          = from;
