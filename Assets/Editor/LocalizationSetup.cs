@@ -66,6 +66,7 @@ public static class LocalizationSetup
         { "instr.rescue_zone",  "Fly to rescue zone" },
         { "instr.land_pickup",  "Land and pick up survivors" },
         { "instr.return_base",  "Return to base" },
+        { "instr.boarding",     "Boarding passengers..." },
     };
 
     [MenuItem("Window/SuperHeli/Setup Localization Tables")]

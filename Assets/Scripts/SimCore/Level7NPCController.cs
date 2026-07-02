@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace SimCore
@@ -13,8 +14,14 @@ namespace SimCore
         [Header("Sven (oskadad, vinkar och går)")]
         public Transform svenTransform;
         public Animator  svenAnimator;
-        public float     walkSpeed     = 1.4f;
-        public float     boardRadius   = 3f;
+        public float     walkSpeed   = 1.4f;
+        public float     boardRadius = 3f;
+
+        [Header("Boarding")]
+        public SceneFader fader;
+        public Transform  seatNils;
+        public Transform  seatSven;
+        public float      passengerWeightKg = 170f;
 
         [Header("Landningsvillkor")]
         public float landingRadiusM = 15f;
@@ -25,7 +32,14 @@ namespace SimCore
         private SimulatorDriver _driver;
         private float           _lyingTimer;
 
-        private enum State { Active, Walking, Complete }
+        private Transform  _nilsOriginalParent;
+        private Vector3    _nilsOriginalLocalPos;
+        private Quaternion _nilsOriginalLocalRot;
+        private Transform  _svenOriginalParent;
+        private Vector3    _svenOriginalLocalPos;
+        private Quaternion _svenOriginalLocalRot;
+
+        private enum State { Active, Walking, Boarding, Complete }
         private State _state = State.Active;
 
         const float MToFt = 3.28084f;
@@ -36,6 +50,19 @@ namespace SimCore
             _lyingTimer = lyingCycleInterval;
             _state      = State.Active;
             IsComplete  = false;
+
+            if (nilsTransform != null)
+            {
+                _nilsOriginalParent   = nilsTransform.parent;
+                _nilsOriginalLocalPos = nilsTransform.localPosition;
+                _nilsOriginalLocalRot = nilsTransform.localRotation;
+            }
+            if (svenTransform != null)
+            {
+                _svenOriginalParent   = svenTransform.parent;
+                _svenOriginalLocalPos = svenTransform.localPosition;
+                _svenOriginalLocalRot = svenTransform.localRotation;
+            }
         }
 
         void Update()
@@ -80,12 +107,8 @@ namespace SimCore
         void CheckLanding()
         {
             Vector3 heliPos = _driver.LastBodyPosition;
-
-            var terrain = Terrain.activeTerrain;
-            float groundY = terrain != null
-                ? terrain.SampleHeight(heliPos) + terrain.transform.position.y
-                : 0f;
-            float aglFt = (heliPos.y - groundY) * MToFt;
+            float   groundY = TerrainUtils.GetGroundY(heliPos);
+            float   aglFt   = (heliPos.y - groundY) * MToFt;
 
             Vector3 heliFlat = new Vector3(heliPos.x, 0f, heliPos.z);
             Vector3 nilsFlat = nilsTransform != null
@@ -114,13 +137,70 @@ namespace SimCore
                 svenTransform.position, target, walkSpeed * Time.deltaTime);
 
             if (Vector3.Distance(svenTransform.position, target) <= boardRadius)
-                Complete();
+                StartBoarding();
         }
 
-        void Complete()
+        void StartBoarding()
         {
+            _state = State.Boarding;
+            StartCoroutine(BoardingSequence());
+        }
+
+        IEnumerator BoardingSequence()
+        {
+            if (fader != null)
+                yield return StartCoroutine(fader.FadeToBlack());
+
+            // Reparent passengers to helicopter seats while screen is black
+            if (seatSven != null && svenTransform != null)
+            {
+                svenTransform.SetParent(seatSven, false);
+                svenTransform.localPosition = Vector3.zero;
+                svenTransform.localRotation = Quaternion.identity;
+            }
+            if (seatNils != null && nilsTransform != null)
+            {
+                nilsTransform.SetParent(seatNils, false);
+                nilsTransform.localPosition = Vector3.zero;
+                nilsTransform.localRotation = Quaternion.identity;
+            }
+
+            if (svenAnimator != null) svenAnimator.enabled = false;
+            if (nilsAnimator != null) nilsAnimator.enabled = false;
+
+            if (_driver != null) _driver.AddPassengerMass(passengerWeightKg);
+
+            yield return new WaitForSeconds(0.5f);
+
+            if (fader != null)
+                yield return StartCoroutine(fader.FadeFromBlack());
+
             _state     = State.Complete;
             IsComplete = true;
+        }
+
+        public void ResetBoarding()
+        {
+            StopAllCoroutines();
+
+            if (nilsTransform != null && _nilsOriginalParent != null)
+            {
+                nilsTransform.SetParent(_nilsOriginalParent, false);
+                nilsTransform.localPosition = _nilsOriginalLocalPos;
+                nilsTransform.localRotation = _nilsOriginalLocalRot;
+            }
+            if (svenTransform != null && _svenOriginalParent != null)
+            {
+                svenTransform.SetParent(_svenOriginalParent, false);
+                svenTransform.localPosition = _svenOriginalLocalPos;
+                svenTransform.localRotation = _svenOriginalLocalRot;
+            }
+
+            if (nilsAnimator != null) nilsAnimator.enabled = true;
+            if (svenAnimator != null) svenAnimator.enabled = true;
+
+            _state     = State.Active;
+            IsComplete = false;
         }
     }
 }

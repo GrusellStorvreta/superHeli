@@ -94,8 +94,9 @@ namespace SimCore
             public float          radiusM;
             public Transform      targetTransform;
             public Transform      hoverAnchorTransform;
-            public bool           showHoverMarker = true;
-            public float          taskTimeLimit   = 0f;  // 0 = use mission-wide timeLimit
+            public bool           showHoverMarker    = true;
+            public float          taskTimeLimit      = 0f;
+            public bool           activatesNPCParent = false;
         }
 
         private TaskDef[] tasks;
@@ -272,15 +273,17 @@ namespace SimCore
                 windPulseMagnitude = 0.2f,
                 windPulseFrequency = 0.5f,
             };
-            timeLimit = 120f;
+            timeLimit = 180f;
             tasks = new TaskDef[]
             {
                 new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 50f,
                               instruction = Loc.Get("instr.climb_50") },
                 new TaskDef { kind = TaskDef.Kind.NavigateTo, targetTransform = rescueZoneTransform,
                               radiusM = 100f, instruction = Loc.Get("instr.rescue_zone") },
-                new TaskDef { kind = TaskDef.Kind.PickupNPCs,
+                new TaskDef { kind = TaskDef.Kind.Land, activatesNPCParent = true,
                               instruction = Loc.Get("instr.land_pickup") },
+                new TaskDef { kind = TaskDef.Kind.PickupNPCs,
+                              instruction = Loc.Get("instr.boarding") },
                 new TaskDef { kind = TaskDef.Kind.NavigateTo, targetTransform = baseTransform,
                               radiusM = 80f, instruction = Loc.Get("instr.return_base") },
                 new TaskDef { kind = TaskDef.Kind.Land,
@@ -557,7 +560,7 @@ namespace SimCore
                     break;
 
                 case TaskDef.Kind.PickupNPCs:
-                    if (level7NPCs != null && level7NPCs.IsComplete) Succeed();
+                    if (level7NPCs != null && level7NPCs.IsComplete) AdvanceTask(pos);
                     else if (rescueNPCs != null && AllBoarded()) AdvanceTask(pos);
                     break;
             }
@@ -612,7 +615,7 @@ namespace SimCore
             if (next.kind == TaskDef.Kind.CourseRun)
                 StartCourseRun();
 
-            if (next.kind == TaskDef.Kind.PickupNPCs && level7NPCParent != null)
+            if (next.activatesNPCParent && level7NPCParent != null)
                 level7NPCParent.SetActive(true);
 
             hoverTimer      = 0f;
@@ -692,6 +695,10 @@ namespace SimCore
             if (rescueNPCs != null)
                 foreach (var npc in rescueNPCs)
                     if (npc != null) npc.Unboard();
+
+            if (level7NPCParent != null) level7NPCParent.SetActive(false);
+            if (level7NPCs != null)     level7NPCs.ResetBoarding();
+            if (driver != null)         driver.ResetPassengerMass();
 
             if (_activeCourse != null && tasks[0].kind == TaskDef.Kind.CourseRun)
             {
