@@ -24,6 +24,7 @@ namespace SimCore
         public RescueNPC[]           rescueNPCs;
         public GameObject            level7NPCParent;
         public Level7NPCController   level7NPCs;
+        public GameObject            instructorObject;
 
         [Header("Checkpoint Courses (Levels 3–6)")]
         public CheckpointCourse[] courses;
@@ -470,6 +471,9 @@ namespace SimCore
 
             RefreshInstruction();
             UpdateNavigationTarget();
+            if (defaultLevelNumber == 7)
+                instructorObject?.SetActive(false);
+
             OnMissionStarted?.Invoke();
         }
 
