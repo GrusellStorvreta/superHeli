@@ -4,7 +4,7 @@ namespace SimCore
 {
     public static class TerrainUtils
     {
-        public static float GetGroundY(Vector3 worldPos)
+        public static Terrain GetTerrainAt(Vector3 worldPos)
         {
             foreach (var t in Terrain.activeTerrains)
             {
@@ -12,9 +12,15 @@ namespace SimCore
                 Vector3 ts = t.terrainData.size;
                 if (worldPos.x >= tp.x && worldPos.x <= tp.x + ts.x &&
                     worldPos.z >= tp.z && worldPos.z <= tp.z + ts.z)
-                    return t.SampleHeight(worldPos) + tp.y;
+                    return t;
             }
-            return 0f;
+            return null;
+        }
+
+        public static float GetGroundY(Vector3 worldPos)
+        {
+            var t = GetTerrainAt(worldPos);
+            return t != null ? t.SampleHeight(worldPos) + t.transform.position.y : 0f;
         }
     }
 }

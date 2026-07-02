@@ -82,26 +82,19 @@ namespace SimCore
 
         bool IsOverSnow(Vector3 worldPos)
         {
-            foreach (var terrain in Terrain.activeTerrains)
-            {
-                Vector3 tp = terrain.transform.position;
-                Vector3 ts = terrain.terrainData.size;
-                if (worldPos.x < tp.x || worldPos.x > tp.x + ts.x ||
-                    worldPos.z < tp.z || worldPos.z > tp.z + ts.z)
-                    continue;
+            var terrain = TerrainUtils.GetTerrainAt(worldPos);
+            if (terrain == null) return false;
 
-                TerrainData td = terrain.terrainData;
-                int layerIdx = ResolveSnowLayer(td);
-                if (layerIdx < 0 || layerIdx >= td.alphamapLayers) return false;
+            TerrainData td = terrain.terrainData;
+            int layerIdx = ResolveSnowLayer(td);
+            if (layerIdx < 0 || layerIdx >= td.alphamapLayers) return false;
 
-                Vector3 local = worldPos - tp;
-                int mapX = Mathf.Clamp((int)(local.x / ts.x * td.alphamapWidth),  0, td.alphamapWidth  - 1);
-                int mapZ = Mathf.Clamp((int)(local.z / ts.z * td.alphamapHeight), 0, td.alphamapHeight - 1);
+            Vector3 local = worldPos - terrain.transform.position;
+            int mapX = Mathf.Clamp((int)(local.x / td.size.x * td.alphamapWidth),  0, td.alphamapWidth  - 1);
+            int mapZ = Mathf.Clamp((int)(local.z / td.size.z * td.alphamapHeight), 0, td.alphamapHeight - 1);
 
-                float[,,] alphas = td.GetAlphamaps(mapX, mapZ, 1, 1);
-                return alphas[0, 0, layerIdx] > snowThreshold;
-            }
-            return false;
+            float[,,] alphas = td.GetAlphamaps(mapX, mapZ, 1, 1);
+            return alphas[0, 0, layerIdx] > snowThreshold;
         }
 
         int ResolveSnowLayer(TerrainData td)
