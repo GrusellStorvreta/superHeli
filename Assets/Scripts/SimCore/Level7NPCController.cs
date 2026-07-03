@@ -17,6 +17,14 @@ namespace SimCore
         public float     walkSpeed   = 1.4f;
         public float     boardRadius = 3f;
 
+        [Header("Pickup-positioner (tomma GameObjects i scenen)")]
+        public Transform nilsPickupPosition;
+        public Transform svenPickupPosition;
+
+        [Header("Höjd (skalas automatiskt vid start)")]
+        public float nilsHeightM = 1.82f;   // 90 kg
+        public float svenHeightM = 1.75f;   // 80 kg
+
         [Header("Boarding")]
         public SceneFader fader;
         public Transform  seatNils;
@@ -31,13 +39,8 @@ namespace SimCore
 
         private SimulatorDriver _driver;
         private float           _lyingTimer;
-
-        private Transform  _nilsOriginalParent;
-        private Vector3    _nilsOriginalLocalPos;
-        private Quaternion _nilsOriginalLocalRot;
-        private Transform  _svenOriginalParent;
-        private Vector3    _svenOriginalLocalPos;
-        private Quaternion _svenOriginalLocalRot;
+        private Transform       _nilsOriginalParent;
+        private Transform       _svenOriginalParent;
 
         private enum State { Active, Walking, Boarding, Complete }
         private State _state = State.Active;
@@ -51,18 +54,17 @@ namespace SimCore
             _state      = State.Active;
             IsComplete  = false;
 
-            if (nilsTransform != null)
-            {
-                _nilsOriginalParent   = nilsTransform.parent;
-                _nilsOriginalLocalPos = nilsTransform.localPosition;
-                _nilsOriginalLocalRot = nilsTransform.localRotation;
-            }
-            if (svenTransform != null)
-            {
-                _svenOriginalParent   = svenTransform.parent;
-                _svenOriginalLocalPos = svenTransform.localPosition;
-                _svenOriginalLocalRot = svenTransform.localRotation;
-            }
+            CacheOriginalParents();
+            ScaleToHeight(nilsTransform, nilsHeightM);
+            ScaleToHeight(svenTransform, svenHeightM);
+        }
+
+        void CacheOriginalParents()
+        {
+            if (nilsTransform != null && _nilsOriginalParent == null)
+                _nilsOriginalParent = nilsTransform.parent;
+            if (svenTransform != null && _svenOriginalParent == null)
+                _svenOriginalParent = svenTransform.parent;
         }
 
         void Update()
@@ -151,7 +153,6 @@ namespace SimCore
             if (fader != null)
                 yield return StartCoroutine(fader.FadeToBlack());
 
-            // Reparent passengers to helicopter seats while screen is black
             if (seatSven != null && svenTransform != null)
             {
                 svenTransform.SetParent(seatSven, false);
@@ -179,43 +180,16 @@ namespace SimCore
             IsComplete = true;
         }
 
-        [ContextMenu("Test Boarding (Editor)")]
-        void TestBoarding()
-        {
-            if (seatSven != null && svenTransform != null)
-            {
-                svenTransform.SetParent(seatSven, false);
-                svenTransform.localPosition = Vector3.zero;
-                svenTransform.localRotation = Quaternion.identity;
-            }
-            if (seatNils != null && nilsTransform != null)
-            {
-                nilsTransform.SetParent(seatNils, false);
-                nilsTransform.localPosition = Vector3.zero;
-                nilsTransform.localRotation = Quaternion.identity;
-            }
-        }
-
-        [ContextMenu("Reset Boarding (Editor)")]
-        void TestReset() => ResetBoarding();
-
         public void ResetBoarding()
         {
             StopAllCoroutines();
             fader?.Clear();
 
-            if (nilsTransform != null && _nilsOriginalParent != null)
-            {
-                nilsTransform.SetParent(_nilsOriginalParent, false);
-                nilsTransform.localPosition = _nilsOriginalLocalPos;
-                nilsTransform.localRotation = _nilsOriginalLocalRot;
-            }
-            if (svenTransform != null && _svenOriginalParent != null)
-            {
-                svenTransform.SetParent(_svenOriginalParent, false);
-                svenTransform.localPosition = _svenOriginalLocalPos;
-                svenTransform.localRotation = _svenOriginalLocalRot;
-            }
+            RestoreNPC(nilsTransform, _nilsOriginalParent, nilsPickupPosition);
+            RestoreNPC(svenTransform, _svenOriginalParent, svenPickupPosition);
+
+            ScaleToHeight(nilsTransform, nilsHeightM);
+            ScaleToHeight(svenTransform, svenHeightM);
 
             if (nilsAnimator != null) nilsAnimator.enabled = true;
             if (svenAnimator != null) svenAnimator.enabled = true;
@@ -223,5 +197,67 @@ namespace SimCore
             _state     = State.Active;
             IsComplete = false;
         }
+
+        void RestoreNPC(Transform npc, Transform originalParent, Transform pickupPosition)
+        {
+            if (npc == null) return;
+
+            if (originalParent != null)
+                npc.SetParent(originalParent, false);
+
+            if (pickupPosition != null)
+            {
+                npc.position = pickupPosition.position;
+                npc.rotation = pickupPosition.rotation;
+            }
+        }
+
+        // Scales 'npc' so its world-space height equals targetHeightM.
+        void ScaleToHeight(Transform npc, float targetHeightM)
+        {
+            if (npc == null || targetHeightM <= 0f) return;
+
+            var renderers = npc.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return;
+
+            Vector3 savedScale = npc.localScale;
+            npc.localScale = Vector3.one;
+
+            Bounds b = renderers[0].bounds;
+            foreach (var r in renderers) b.Encapsulate(r.bounds);
+            float naturalHeight = b.size.y;
+
+            if (naturalHeight <= 0f) { npc.localScale = savedScale; return; }
+
+            npc.localScale = Vector3.one * (targetHeightM / naturalHeight);
+        }
+
+        // ------- Editor helpers -------
+
+        [ContextMenu("Test Boarding (Editor)")]
+        void TestBoarding()
+        {
+            CacheOriginalParents();
+
+            Debug.Log($"[Level7] TestBoarding — svenTransform={svenTransform}, seatSven={seatSven}, nilsTransform={nilsTransform}, seatNils={seatNils}");
+
+            if (seatSven != null && svenTransform != null)
+            {
+                svenTransform.SetParent(seatSven, false);
+                svenTransform.localPosition = Vector3.zero;
+                svenTransform.localRotation = Quaternion.identity;
+                Debug.Log("[Level7] Sven placed in seat.");
+            }
+            if (seatNils != null && nilsTransform != null)
+            {
+                nilsTransform.SetParent(seatNils, false);
+                nilsTransform.localPosition = Vector3.zero;
+                nilsTransform.localRotation = Quaternion.identity;
+                Debug.Log("[Level7] Nils placed in seat.");
+            }
+        }
+
+        [ContextMenu("Reset Boarding (Editor)")]
+        void TestReset() => ResetBoarding();
     }
 }
