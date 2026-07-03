@@ -29,7 +29,8 @@ namespace SimCore
         public SceneFader fader;
         public Transform  seatNils;
         public Transform  seatSven;
-        public float      passengerWeightKg = 170f;
+        public float      passengerWeightKg  = 170f;
+        public string     svenSitTrigger     = "sitIdle";
 
         [Header("Landningsvillkor")]
         public float landingRadiusM = 15f;
@@ -166,7 +167,8 @@ namespace SimCore
                 nilsTransform.localRotation = Quaternion.identity;
             }
 
-            if (svenAnimator != null) svenAnimator.enabled = false;
+            if (svenAnimator != null && !string.IsNullOrEmpty(svenSitTrigger))
+                svenAnimator.SetTrigger(svenSitTrigger);
             if (nilsAnimator != null) nilsAnimator.enabled = false;
 
             if (_driver != null) _driver.AddPassengerMass(passengerWeightKg);
@@ -192,7 +194,11 @@ namespace SimCore
             ScaleToHeight(svenTransform, svenHeightM);
 
             if (nilsAnimator != null) nilsAnimator.enabled = true;
-            if (svenAnimator != null) svenAnimator.enabled = true;
+            if (svenAnimator != null)
+            {
+                svenAnimator.enabled = true;
+                svenAnimator.ResetTrigger(svenSitTrigger);
+            }
 
             _state     = State.Active;
             IsComplete = false;
