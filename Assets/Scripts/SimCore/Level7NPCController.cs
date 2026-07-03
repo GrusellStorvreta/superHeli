@@ -250,21 +250,25 @@ namespace SimCore
         {
             CacheOriginalParents();
 
-            Debug.Log($"[Level7] TestBoarding — svenTransform={svenTransform}, seatSven={seatSven}, nilsTransform={nilsTransform}, seatNils={seatNils}");
-
             if (seatSven != null && svenTransform != null)
             {
                 svenTransform.SetParent(seatSven, false);
                 svenTransform.localPosition = Vector3.zero;
                 svenTransform.localRotation = Quaternion.identity;
-                Debug.Log("[Level7] Sven placed in seat.");
+                if (svenAnimator != null)
+                {
+                    if (!string.IsNullOrEmpty(svenSitTrigger))
+                        svenAnimator.SetTrigger(svenSitTrigger);
+                    else
+                        svenAnimator.enabled = false;
+                }
             }
             if (seatNils != null && nilsTransform != null)
             {
                 nilsTransform.SetParent(seatNils, false);
                 nilsTransform.localPosition = Vector3.zero;
                 nilsTransform.localRotation = Quaternion.identity;
-                Debug.Log("[Level7] Nils placed in seat.");
+                if (nilsAnimator != null) nilsAnimator.enabled = false;
             }
         }
 
