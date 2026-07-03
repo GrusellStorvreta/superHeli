@@ -5,33 +5,23 @@ namespace SimCore
 {
     public class Level7NPCController : MonoBehaviour
     {
-        [Header("Nils (skadad, ligger kvar)")]
-        public Transform nilsTransform;
-        public Animator  nilsAnimator;
-        public int       lyingVariantCount  = 2;
-        public float     lyingCycleInterval = 4f;
+        [Header("Räddningszonen — aktiva vid upphämtning")]
+        public GameObject nilsRescue;
+        public Animator   nilsAnimator;
+        public int        lyingVariantCount  = 2;
+        public float      lyingCycleInterval = 4f;
+        public GameObject svenRescue;
+        public Animator   svenAnimator;
+        public float      walkSpeed    = 1.4f;
+        public float      boardRadius  = 3f;
 
-        [Header("Sven (oskadad, vinkar och går)")]
-        public Transform svenTransform;
-        public Animator  svenAnimator;
-        public float     walkSpeed   = 1.4f;
-        public float     boardRadius = 3f;
-
-        [Header("Pickup-positioner (tomma GameObjects i scenen)")]
-        public Transform nilsPickupPosition;
-        public Transform svenPickupPosition;
-
-        [Header("Höjd (skalas automatiskt vid start)")]
-        public float nilsHeightM = 1.82f;   // 90 kg
-        public float svenHeightM = 1.75f;   // 80 kg
+        [Header("Helikoptern — förinställda, inaktiva vid start")]
+        public GameObject nilsSeated;
+        public GameObject svenSeated;
 
         [Header("Boarding")]
         public SceneFader fader;
-        public Transform  seatNils;
-        public Transform  seatSven;
-        public Vector3    seatOffset        = Vector3.zero; // local offset from seat pivot (e.g. Y to compensate for foot origin)
-        public float      passengerWeightKg  = 170f;
-        public string     svenSitTrigger     = "sitIdle";
+        public float      passengerWeightKg = 170f;
 
         [Header("Landningsvillkor")]
         public float landingRadiusM = 15f;
@@ -41,8 +31,6 @@ namespace SimCore
 
         private SimulatorDriver _driver;
         private float           _lyingTimer;
-        private Transform       _nilsOriginalParent;
-        private Transform       _svenOriginalParent;
 
         private enum State { Active, Walking, Boarding, Complete }
         private State _state = State.Active;
@@ -56,17 +44,10 @@ namespace SimCore
             _state      = State.Active;
             IsComplete  = false;
 
-            CacheOriginalParents();
-            ScaleToHeight(nilsTransform, nilsHeightM);
-            ScaleToHeight(svenTransform, svenHeightM);
-        }
-
-        void CacheOriginalParents()
-        {
-            if (nilsTransform != null && _nilsOriginalParent == null)
-                _nilsOriginalParent = nilsTransform.parent;
-            if (svenTransform != null && _svenOriginalParent == null)
-                _svenOriginalParent = svenTransform.parent;
+            nilsRescue?.SetActive(true);
+            svenRescue?.SetActive(true);
+            nilsSeated?.SetActive(false);
+            svenSeated?.SetActive(false);
         }
 
         void Update()
@@ -101,11 +82,11 @@ namespace SimCore
 
         void FaceSven(Vector3 heliPos)
         {
-            if (svenTransform == null) return;
-            Vector3 dir = heliPos - svenTransform.position;
+            if (svenRescue == null) return;
+            Vector3 dir = heliPos - svenRescue.transform.position;
             dir.y = 0f;
             if (dir.sqrMagnitude > 0.001f)
-                svenTransform.rotation = Quaternion.LookRotation(dir.normalized);
+                svenRescue.transform.rotation = Quaternion.LookRotation(dir.normalized);
         }
 
         void CheckLanding()
@@ -115,8 +96,8 @@ namespace SimCore
             float   aglFt   = (heliPos.y - groundY) * MToFt;
 
             Vector3 heliFlat = new Vector3(heliPos.x, 0f, heliPos.z);
-            Vector3 nilsFlat = nilsTransform != null
-                ? new Vector3(nilsTransform.position.x, 0f, nilsTransform.position.z)
+            Vector3 nilsFlat = nilsRescue != null
+                ? new Vector3(nilsRescue.transform.position.x, 0f, nilsRescue.transform.position.z)
                 : Vector3.zero;
 
             if (aglFt <= landingAglFt && Vector3.Distance(heliFlat, nilsFlat) <= landingRadiusM)
@@ -131,23 +112,20 @@ namespace SimCore
 
         void WalkSvenToHelicopter()
         {
-            if (svenTransform == null) return;
+            if (svenRescue == null) return;
 
             Vector3 heliPos = _driver.LastBodyPosition;
-            Vector3 target  = new Vector3(heliPos.x, svenTransform.position.y, heliPos.z);
+            Vector3 target  = new Vector3(heliPos.x, svenRescue.transform.position.y, heliPos.z);
 
             FaceSven(heliPos);
-            svenTransform.position = Vector3.MoveTowards(
-                svenTransform.position, target, walkSpeed * Time.deltaTime);
+            svenRescue.transform.position = Vector3.MoveTowards(
+                svenRescue.transform.position, target, walkSpeed * Time.deltaTime);
 
-            if (Vector3.Distance(svenTransform.position, target) <= boardRadius)
-                StartBoarding();
-        }
-
-        void StartBoarding()
-        {
-            _state = State.Boarding;
-            StartCoroutine(BoardingSequence());
+            if (Vector3.Distance(svenRescue.transform.position, target) <= boardRadius)
+            {
+                _state = State.Boarding;
+                StartCoroutine(BoardingSequence());
+            }
         }
 
         IEnumerator BoardingSequence()
@@ -155,19 +133,12 @@ namespace SimCore
             if (fader != null)
                 yield return StartCoroutine(fader.FadeToBlack());
 
-            PlaceInSeat(svenTransform, seatSven, svenHeightM);
-            PlaceInSeat(nilsTransform, seatNils, nilsHeightM);
+            nilsRescue?.SetActive(false);
+            svenRescue?.SetActive(false);
+            nilsSeated?.SetActive(true);
+            svenSeated?.SetActive(true);
 
-            if (svenAnimator != null)
-            {
-                if (!string.IsNullOrEmpty(svenSitTrigger))
-                    svenAnimator.SetTrigger(svenSitTrigger);
-                else
-                    svenAnimator.enabled = false;
-            }
-            if (nilsAnimator != null) nilsAnimator.enabled = false;
-
-            if (_driver != null) _driver.AddPassengerMass(passengerWeightKg);
+            _driver?.AddPassengerMass(passengerWeightKg);
 
             yield return new WaitForSeconds(0.5f);
 
@@ -183,89 +154,25 @@ namespace SimCore
             StopAllCoroutines();
             fader?.Clear();
 
-            RestoreNPC(nilsTransform, _nilsOriginalParent, nilsPickupPosition);
-            RestoreNPC(svenTransform, _svenOriginalParent, svenPickupPosition);
-
-            ScaleToHeight(nilsTransform, nilsHeightM);
-            ScaleToHeight(svenTransform, svenHeightM);
-
-            if (nilsAnimator != null) nilsAnimator.enabled = true;
-            if (svenAnimator != null)
-            {
-                svenAnimator.enabled = true;
-                svenAnimator.ResetTrigger(svenSitTrigger);
-            }
+            nilsRescue?.SetActive(true);
+            svenRescue?.SetActive(true);
+            nilsSeated?.SetActive(false);
+            svenSeated?.SetActive(false);
 
             _state     = State.Active;
             IsComplete = false;
         }
 
-        void RestoreNPC(Transform npc, Transform originalParent, Transform pickupPosition)
-        {
-            if (npc == null) return;
-
-            if (originalParent != null)
-                npc.SetParent(originalParent, false);
-
-            if (pickupPosition != null)
-            {
-                npc.position = pickupPosition.position;
-                npc.rotation = pickupPosition.rotation;
-            }
-        }
-
-        // Reparents npc to seat, preserving world scale, then snaps to seat transform + offset.
-        void PlaceInSeat(Transform npc, Transform seat, float heightM)
-        {
-            if (npc == null || seat == null) return;
-            ScaleToHeight(npc, heightM);
-            npc.SetParent(seat, true);
-            npc.position = seat.position + seat.TransformDirection(seatOffset);
-            npc.rotation = seat.rotation;
-        }
-
-        // Scales 'npc' so its world-space height equals targetHeightM.
-        void ScaleToHeight(Transform npc, float targetHeightM)
-        {
-            if (npc == null || targetHeightM <= 0f) return;
-
-            var renderers = npc.GetComponentsInChildren<Renderer>();
-            if (renderers.Length == 0) return;
-
-            Vector3 savedScale = npc.localScale;
-            npc.localScale = Vector3.one;
-
-            Bounds b = renderers[0].bounds;
-            foreach (var r in renderers) b.Encapsulate(r.bounds);
-            float naturalHeight = b.size.y;
-
-            if (naturalHeight <= 0f) { npc.localScale = savedScale; return; }
-
-            npc.localScale = Vector3.one * (targetHeightM / naturalHeight);
-        }
-
-        // ------- Editor helpers -------
-
         [ContextMenu("Test Boarding (Editor)")]
         void TestBoarding()
         {
-            // Activate parent so animators run and OnEnable caches original parents
-            bool wasActive = gameObject.activeInHierarchy;
-            if (!wasActive) gameObject.SetActive(true);
-
-            CacheOriginalParents();
-
-            PlaceInSeat(svenTransform, seatSven, svenHeightM);
-            PlaceInSeat(nilsTransform, seatNils, nilsHeightM);
-
-            if (svenAnimator != null)
+            if (!Application.isPlaying)
             {
-                if (!string.IsNullOrEmpty(svenSitTrigger))
-                    svenAnimator.SetTrigger(svenSitTrigger);
-                else
-                    svenAnimator.enabled = false;
+                Debug.LogWarning("[Level7] Test Boarding kräver Play mode.");
+                return;
             }
-            if (nilsAnimator != null) nilsAnimator.enabled = false;
+            _state = State.Boarding;
+            StartCoroutine(BoardingSequence());
         }
 
         [ContextMenu("Reset Boarding (Editor)")]
