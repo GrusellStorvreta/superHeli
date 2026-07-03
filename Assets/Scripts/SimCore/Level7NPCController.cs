@@ -29,6 +29,7 @@ namespace SimCore
         public SceneFader fader;
         public Transform  seatNils;
         public Transform  seatSven;
+        public Vector3    seatOffset        = Vector3.zero; // local offset from seat pivot (e.g. Y to compensate for foot origin)
         public float      passengerWeightKg  = 170f;
         public string     svenSitTrigger     = "sitIdle";
 
@@ -213,13 +214,13 @@ namespace SimCore
             }
         }
 
-        // Reparents npc to seat, preserving world scale, then snaps to seat transform.
+        // Reparents npc to seat, preserving world scale, then snaps to seat transform + offset.
         void PlaceInSeat(Transform npc, Transform seat, float heightM)
         {
             if (npc == null || seat == null) return;
-            ScaleToHeight(npc, heightM);        // set correct world height before reparenting
-            npc.SetParent(seat, true);           // worldPositionStays:true keeps world scale intact
-            npc.position = seat.position;
+            ScaleToHeight(npc, heightM);
+            npc.SetParent(seat, true);
+            npc.position = seat.position + seat.TransformDirection(seatOffset);
             npc.rotation = seat.rotation;
         }
 
@@ -253,8 +254,6 @@ namespace SimCore
             if (!wasActive) gameObject.SetActive(true);
 
             CacheOriginalParents();
-            ScaleToHeight(svenTransform, svenHeightM);
-            ScaleToHeight(nilsTransform, nilsHeightM);
 
             PlaceInSeat(svenTransform, seatSven, svenHeightM);
             PlaceInSeat(nilsTransform, seatNils, nilsHeightM);
