@@ -28,6 +28,8 @@ namespace SimCore
         public void Clear()
         {
             StopAllCoroutines();
+            if (_group == null) _group = GetComponent<CanvasGroup>();
+            if (_group == null) return;
             _group.alpha          = 0f;
             _group.blocksRaycasts = false;
         }
