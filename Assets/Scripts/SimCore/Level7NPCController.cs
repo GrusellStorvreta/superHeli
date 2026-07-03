@@ -154,18 +154,8 @@ namespace SimCore
             if (fader != null)
                 yield return StartCoroutine(fader.FadeToBlack());
 
-            if (seatSven != null && svenTransform != null)
-            {
-                svenTransform.SetParent(seatSven, false);
-                svenTransform.localPosition = Vector3.zero;
-                svenTransform.localRotation = Quaternion.identity;
-            }
-            if (seatNils != null && nilsTransform != null)
-            {
-                nilsTransform.SetParent(seatNils, false);
-                nilsTransform.localPosition = Vector3.zero;
-                nilsTransform.localRotation = Quaternion.identity;
-            }
+            PlaceInSeat(svenTransform, seatSven, svenHeightM);
+            PlaceInSeat(nilsTransform, seatNils, nilsHeightM);
 
             if (svenAnimator != null)
             {
@@ -223,6 +213,16 @@ namespace SimCore
             }
         }
 
+        // Reparents npc to seat, preserving world scale, then snaps to seat transform.
+        void PlaceInSeat(Transform npc, Transform seat, float heightM)
+        {
+            if (npc == null || seat == null) return;
+            ScaleToHeight(npc, heightM);        // set correct world height before reparenting
+            npc.SetParent(seat, true);           // worldPositionStays:true keeps world scale intact
+            npc.position = seat.position;
+            npc.rotation = seat.rotation;
+        }
+
         // Scales 'npc' so its world-space height equals targetHeightM.
         void ScaleToHeight(Transform npc, float targetHeightM)
         {
@@ -248,28 +248,25 @@ namespace SimCore
         [ContextMenu("Test Boarding (Editor)")]
         void TestBoarding()
         {
-            CacheOriginalParents();
+            // Activate parent so animators run and OnEnable caches original parents
+            bool wasActive = gameObject.activeInHierarchy;
+            if (!wasActive) gameObject.SetActive(true);
 
-            if (seatSven != null && svenTransform != null)
+            CacheOriginalParents();
+            ScaleToHeight(svenTransform, svenHeightM);
+            ScaleToHeight(nilsTransform, nilsHeightM);
+
+            PlaceInSeat(svenTransform, seatSven, svenHeightM);
+            PlaceInSeat(nilsTransform, seatNils, nilsHeightM);
+
+            if (svenAnimator != null)
             {
-                svenTransform.SetParent(seatSven, false);
-                svenTransform.localPosition = Vector3.zero;
-                svenTransform.localRotation = Quaternion.identity;
-                if (svenAnimator != null)
-                {
-                    if (!string.IsNullOrEmpty(svenSitTrigger))
-                        svenAnimator.SetTrigger(svenSitTrigger);
-                    else
-                        svenAnimator.enabled = false;
-                }
+                if (!string.IsNullOrEmpty(svenSitTrigger))
+                    svenAnimator.SetTrigger(svenSitTrigger);
+                else
+                    svenAnimator.enabled = false;
             }
-            if (seatNils != null && nilsTransform != null)
-            {
-                nilsTransform.SetParent(seatNils, false);
-                nilsTransform.localPosition = Vector3.zero;
-                nilsTransform.localRotation = Quaternion.identity;
-                if (nilsAnimator != null) nilsAnimator.enabled = false;
-            }
+            if (nilsAnimator != null) nilsAnimator.enabled = false;
         }
 
         [ContextMenu("Reset Boarding (Editor)")]
