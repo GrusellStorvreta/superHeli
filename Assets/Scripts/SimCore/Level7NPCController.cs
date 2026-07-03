@@ -167,8 +167,13 @@ namespace SimCore
                 nilsTransform.localRotation = Quaternion.identity;
             }
 
-            if (svenAnimator != null && !string.IsNullOrEmpty(svenSitTrigger))
-                svenAnimator.SetTrigger(svenSitTrigger);
+            if (svenAnimator != null)
+            {
+                if (!string.IsNullOrEmpty(svenSitTrigger))
+                    svenAnimator.SetTrigger(svenSitTrigger);
+                else
+                    svenAnimator.enabled = false;
+            }
             if (nilsAnimator != null) nilsAnimator.enabled = false;
 
             if (_driver != null) _driver.AddPassengerMass(passengerWeightKg);
