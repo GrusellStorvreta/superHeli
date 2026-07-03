@@ -163,6 +163,26 @@ namespace SimCore
             IsComplete = false;
         }
 
+        [ContextMenu("Log NPC Heights (Editor)")]
+        void LogHeights()
+        {
+            LogHeight("SvenRescue", svenRescue);
+            LogHeight("NilsRescue", nilsRescue);
+        }
+
+        void LogHeight(string label, GameObject go)
+        {
+            if (go == null) { Debug.Log($"{label}: ej tilldelad"); return; }
+            var renderers = go.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) { Debug.Log($"{label}: inga Renderers"); return; }
+            Vector3 savedScale = go.transform.localScale;
+            go.transform.localScale = Vector3.one;
+            Bounds b = renderers[0].bounds;
+            foreach (var r in renderers) b.Encapsulate(r.bounds);
+            go.transform.localScale = savedScale;
+            Debug.Log($"{label}: höjd vid scale 1 = {b.size.y:F3} m  (nuvarande scale: {savedScale})");
+        }
+
         [ContextMenu("Test Boarding (Editor)")]
         void TestBoarding()
         {

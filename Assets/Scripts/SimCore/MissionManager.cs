@@ -472,7 +472,10 @@ namespace SimCore
             RefreshInstruction();
             UpdateNavigationTarget();
             if (defaultLevelNumber == 7)
+            {
                 instructorObject?.SetActive(false);
+                level7NPCs?.ResetBoarding();   // ensure seated NPCs are inactive from the start
+            }
 
             OnMissionStarted?.Invoke();
         }
