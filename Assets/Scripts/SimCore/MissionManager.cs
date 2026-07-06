@@ -102,6 +102,7 @@ namespace SimCore
 
         private TaskDef[] tasks;
         private float     timeLimit;
+        private float     missionElapsed;
 
         // --- Runtime state ---
 
@@ -278,16 +279,22 @@ namespace SimCore
             tasks = new TaskDef[]
             {
                 new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 50f,
+                              taskTimeLimit = 30f,
                               instruction = Loc.Get("instr.climb_50") },
                 new TaskDef { kind = TaskDef.Kind.NavigateTo, targetTransform = rescueZoneTransform,
-                              radiusM = 100f, instruction = Loc.Get("instr.rescue_zone") },
+                              radiusM = 100f, taskTimeLimit = 120f,
+                              instruction = Loc.Get("instr.rescue_zone") },
                 new TaskDef { kind = TaskDef.Kind.Land, activatesNPCParent = true,
+                              taskTimeLimit = 60f,
                               instruction = Loc.Get("instr.land_pickup") },
                 new TaskDef { kind = TaskDef.Kind.PickupNPCs,
+                              taskTimeLimit = 90f,
                               instruction = Loc.Get("instr.boarding") },
                 new TaskDef { kind = TaskDef.Kind.NavigateTo, targetTransform = baseTransform,
-                              radiusM = 80f, instruction = Loc.Get("instr.return_base") },
+                              radiusM = 80f, taskTimeLimit = 120f,
+                              instruction = Loc.Get("instr.return_base") },
                 new TaskDef { kind = TaskDef.Kind.Land,
+                              taskTimeLimit = 60f,
                               instruction = Loc.Get("instr.land") },
             };
         }
@@ -455,6 +462,7 @@ namespace SimCore
             TimeRemaining     = tasks.Length > 0 && tasks[0].taskTimeLimit > 0
                                     ? tasks[0].taskTimeLimit
                                     : timeLimit;
+            missionElapsed    = 0f;
             hoverTimer        = 0f;
             HoverProgress     = 0f;
             HoverInZone       = false;
@@ -474,7 +482,9 @@ namespace SimCore
             if (defaultLevelNumber == 7)
             {
                 instructorObject?.SetActive(false);
-                level7NPCs?.ResetBoarding();   // ensure seated NPCs are inactive from the start
+                level7NPCParent?.SetActive(false);   // re-activated by the rescue-zone Land task
+                level7NPCs?.ResetBoarding();         // ensure seated NPCs are inactive from the start
+                driver?.ResetPassengerMass();        // Try Again after time-out must clear boarded weight
             }
 
             OnMissionStarted?.Invoke();
@@ -485,7 +495,8 @@ namespace SimCore
             if (CurrentPhase != Phase.Running) return;
             if (driver == null) { driver = FindObjectOfType<SimulatorDriver>(); return; }
 
-            TimeRemaining -= Time.deltaTime;
+            missionElapsed += Time.deltaTime;
+            TimeRemaining  -= Time.deltaTime;
             if (TimeRemaining <= 0f)
             {
                 TimeRemaining = 0f;
@@ -555,7 +566,7 @@ namespace SimCore
 
                 case TaskDef.Kind.Land:
                     if (landingReceived)
-                        Succeed();
+                        AdvanceTask(pos);
                     break;
 
                 case TaskDef.Kind.NavigateTo:
@@ -707,11 +718,13 @@ namespace SimCore
             if (level7NPCs != null)     level7NPCs.ResetBoarding();
             if (driver != null)         driver.ResetPassengerMass();
 
+            missionElapsed = 0f;
+            TimeRemaining  = tasks.Length > 0 && tasks[0].taskTimeLimit > 0
+                                ? tasks[0].taskTimeLimit
+                                : timeLimit;
+
             if (_activeCourse != null && tasks[0].kind == TaskDef.Kind.CourseRun)
-            {
-                TimeRemaining = timeLimit;
                 StartCourseRun();
-            }
 
             RefreshInstruction();
             UpdateNavigationTarget();
@@ -728,7 +741,7 @@ namespace SimCore
 
         void Succeed()
         {
-            FinalTime    = timeLimit - TimeRemaining;
+            FinalTime    = missionElapsed;
             CurrentPhase = Phase.Success;
             IsHoverTask  = false;
             hoverZoneMarker?.gameObject.SetActive(false);
@@ -741,7 +754,7 @@ namespace SimCore
 
         void Fail()
         {
-            string reason = $"Time ran out\n{tasks[taskIdx].instruction}";
+            string reason = $"{Loc.Get("result.timesup")}\n{tasks[taskIdx].instruction}";
             CurrentPhase  = Phase.Failed;
             IsHoverTask   = false;
             hoverZoneMarker?.gameObject.SetActive(false);

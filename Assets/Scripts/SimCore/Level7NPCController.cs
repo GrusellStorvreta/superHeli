@@ -107,7 +107,7 @@ namespace SimCore
         void EnterWalking()
         {
             _state = State.Walking;
-            svenAnimator?.SetTrigger("startWalking");
+            svenAnimator?.SetBool("startWalking", true);
         }
 
         void WalkSvenToHelicopter()
@@ -158,6 +158,8 @@ namespace SimCore
             svenRescue?.SetActive(true);
             nilsSeated?.SetActive(false);
             svenSeated?.SetActive(false);
+
+            svenAnimator?.SetBool("startWalking", false);
 
             _state     = State.Active;
             IsComplete = false;
