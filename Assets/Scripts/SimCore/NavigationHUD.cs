@@ -46,7 +46,7 @@ namespace SimCore
             Vector3 target  = navTarget.Value;
 
             Vector3 toTarget = target - heliPos;
-            float   distM    = toTarget.magnitude;
+            float   distM    = new Vector2(toTarget.x, toTarget.z).magnitude; // ground-plane distance
             string  distStr  = distM >= 1000f
                                ? $"{distM / 1000f:F1} km"
                                : $"{distM:F0} m";

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace SimCore
 {
-    public class Level7NPCController : MonoBehaviour
+    public class Level7NPCController : MonoBehaviour, ILevelResetHandler
     {
         [Header("Räddningszonen — aktiva vid upphämtning")]
         public GameObject nilsRescue;
@@ -24,13 +24,15 @@ namespace SimCore
         public float      passengerWeightKg = 170f;
 
         [Header("Landningsvillkor")]
-        public float landingRadiusM = 15f;
-        public float landingAglFt   = 6f;
+        public float landingRadiusM    = 15f;
+        public float landingAglFt      = 6f;
+        public float landingMaxSpeedMs = 0.5f;
 
-        public bool IsComplete { get; private set; }
+        public bool IsComplete => _state == State.Complete;
 
         private SimulatorDriver _driver;
         private float           _lyingTimer;
+        private int             _lyingVariant;
 
         private enum State { Active, Walking, Boarding, Complete }
         private State _state = State.Active;
@@ -41,13 +43,7 @@ namespace SimCore
         {
             _driver     = FindObjectOfType<SimulatorDriver>();
             _lyingTimer = lyingCycleInterval;
-            _state      = State.Active;
-            IsComplete  = false;
-
-            nilsRescue?.SetActive(true);
-            svenRescue?.SetActive(true);
-            nilsSeated?.SetActive(false);
-            svenSeated?.SetActive(false);
+            ResetBoarding();
         }
 
         void Update()
@@ -75,7 +71,9 @@ namespace SimCore
             _lyingTimer -= Time.deltaTime;
             if (_lyingTimer <= 0f)
             {
-                nilsAnimator.SetInteger("lyingVariant", Random.Range(0, lyingVariantCount));
+                // Offset by 1..count-1 so the same variant never plays twice in a row
+                _lyingVariant = (_lyingVariant + Random.Range(1, lyingVariantCount)) % lyingVariantCount;
+                nilsAnimator.SetInteger("lyingVariant", _lyingVariant);
                 _lyingTimer = lyingCycleInterval;
             }
         }
@@ -91,6 +89,9 @@ namespace SimCore
 
         void CheckLanding()
         {
+            // Hovering low doesn't count — the helicopter must be standing still
+            if (_driver.LastBodyVelocity.magnitude > landingMaxSpeedMs) return;
+
             Vector3 heliPos = _driver.LastBodyPosition;
             float   groundY = TerrainUtils.GetGroundY(heliPos);
             float   aglFt   = (heliPos.y - groundY) * MToFt;
@@ -115,7 +116,17 @@ namespace SimCore
             if (svenRescue == null) return;
 
             Vector3 heliPos = _driver.LastBodyPosition;
-            Vector3 target  = new Vector3(heliPos.x, svenRescue.transform.position.y, heliPos.z);
+
+            // Player took off again — Sven stops and waits for the next landing
+            float aglFt = (heliPos.y - TerrainUtils.GetGroundY(heliPos)) * MToFt;
+            if (aglFt > landingAglFt)
+            {
+                svenAnimator?.SetBool("startWalking", false);
+                _state = State.Active;
+                return;
+            }
+
+            Vector3 target = new Vector3(heliPos.x, svenRescue.transform.position.y, heliPos.z);
 
             FaceSven(heliPos);
             svenRescue.transform.position = Vector3.MoveTowards(
@@ -145,9 +156,10 @@ namespace SimCore
             if (fader != null)
                 yield return StartCoroutine(fader.FadeFromBlack());
 
-            _state     = State.Complete;
-            IsComplete = true;
+            _state = State.Complete;
         }
+
+        public void OnLevelReset() => ResetBoarding();
 
         public void ResetBoarding()
         {
@@ -161,8 +173,11 @@ namespace SimCore
 
             svenAnimator?.SetBool("startWalking", false);
 
-            _state     = State.Active;
-            IsComplete = false;
+            // Boarding added the passenger weight, so resetting it belongs here too
+            if (_driver == null) _driver = FindObjectOfType<SimulatorDriver>();
+            _driver?.ResetPassengerMass();
+
+            _state = State.Active;
         }
 
         [ContextMenu("Log NPC Heights (Editor)")]

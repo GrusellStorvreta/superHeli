@@ -21,7 +21,6 @@ namespace SimCore
         [Header("Level 7")]
         public Transform             rescueZoneTransform;
         public Transform             baseTransform;
-        public RescueNPC[]           rescueNPCs;
         public GameObject            level7NPCParent;
         public Level7NPCController   level7NPCs;
         public GameObject            instructorObject;
@@ -95,9 +94,10 @@ namespace SimCore
             public float          radiusM;
             public Transform      targetTransform;
             public Transform      hoverAnchorTransform;
-            public bool           showHoverMarker    = true;
-            public float          taskTimeLimit      = 0f;
-            public bool           activatesNPCParent = false;
+            public bool           showHoverMarker = true;
+            public float          taskTimeLimit   = 0f;
+            public GameObject     activateOnStart;  // activated when the task begins,
+                                                    // deactivated again on mission reset
         }
 
         private TaskDef[] tasks;
@@ -133,6 +133,11 @@ namespace SimCore
         void Start()
         {
             if (_initializedExternally) return; // Initialize() already called — skip to avoid double-init
+
+            // With a main menu in the scene, the menu drives Initialize()/ApplyDefaultCabinState.
+            // Auto-starting here would race the menu's disable and run whatever level the
+            // Inspector happens to hold — including Level 7's instructor deactivation.
+            if (FindObjectOfType<MainMenuManager>() != null) return;
             if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
             landingChecker = FindObjectOfType<LandingChecker>();
             if (landingChecker != null) landingChecker.OnLanding += OnLanding;
@@ -193,7 +198,7 @@ namespace SimCore
         void BuildLevel1()
         {
             _environment = new LevelEnvironment { windSpeed = 0f };
-            timeLimit    = 30f;
+            timeLimit    = 60f;
             tasks        = new TaskDef[]
             {
                 new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 100f,
@@ -284,7 +289,8 @@ namespace SimCore
                 new TaskDef { kind = TaskDef.Kind.NavigateTo, targetTransform = rescueZoneTransform,
                               radiusM = 100f, taskTimeLimit = 120f,
                               instruction = Loc.Get("instr.rescue_zone") },
-                new TaskDef { kind = TaskDef.Kind.Land, activatesNPCParent = true,
+                new TaskDef { kind = TaskDef.Kind.Land, activateOnStart = level7NPCParent,
+                              targetTransform = rescueZoneTransform, // nav arrow stays on the zone
                               taskTimeLimit = 60f,
                               instruction = Loc.Get("instr.land_pickup") },
                 new TaskDef { kind = TaskDef.Kind.PickupNPCs,
@@ -479,15 +485,31 @@ namespace SimCore
 
             RefreshInstruction();
             UpdateNavigationTarget();
-            if (defaultLevelNumber == 7)
-            {
-                instructorObject?.SetActive(false);
-                level7NPCParent?.SetActive(false);   // re-activated by the rescue-zone Land task
-                level7NPCs?.ResetBoarding();         // ensure seated NPCs are inactive from the start
-                driver?.ResetPassengerMass();        // Try Again after time-out must clear boarded weight
-            }
+
+            // Level 7 swaps the instructor for the rescue NPCs; all other levels keep him seated
+            instructorObject?.SetActive(defaultLevelNumber != 7);
+            level7NPCParent?.SetActive(false);   // re-activated by the rescue-zone Land task
+            BroadcastLevelReset();               // Try Again after time-out must clear boarded weight
 
             OnMissionStarted?.Invoke();
+        }
+
+        // Default cabin for Free Flight: instructor in the passenger seat,
+        // level NPCs hidden, no extra mass.
+        public void ApplyDefaultCabinState()
+        {
+            instructorObject?.SetActive(true);
+            level7NPCParent?.SetActive(false);
+            BroadcastLevelReset();
+        }
+
+        // Level-specific components restore their start state here. Searches
+        // inactive objects too — they never get Awake/OnEnable, so they cannot
+        // subscribe to CrashHandler.OnCrashReset themselves.
+        void BroadcastLevelReset()
+        {
+            foreach (var mb in FindObjectsOfType<MonoBehaviour>(true))
+                if (mb is ILevelResetHandler handler) handler.OnLevelReset();
         }
 
         void Update()
@@ -572,23 +594,17 @@ namespace SimCore
                 case TaskDef.Kind.NavigateTo:
                     if (t.targetTransform != null)
                     {
-                        float dist = Vector3.Distance(pos, t.targetTransform.position);
+                        // Ground-plane distance — altitude shouldn't delay arrival
+                        Vector3 to   = t.targetTransform.position - pos;
+                        float   dist = new Vector2(to.x, to.z).magnitude;
                         if (dist <= t.radiusM) AdvanceTask(pos);
                     }
                     break;
 
                 case TaskDef.Kind.PickupNPCs:
                     if (level7NPCs != null && level7NPCs.IsComplete) AdvanceTask(pos);
-                    else if (rescueNPCs != null && AllBoarded()) AdvanceTask(pos);
                     break;
             }
-        }
-
-        bool AllBoarded()
-        {
-            foreach (var npc in rescueNPCs)
-                if (npc == null || !npc.IsBoarded) return false;
-            return true;
         }
 
         void AdvanceTask(Vector3 pos)
@@ -633,8 +649,8 @@ namespace SimCore
             if (next.kind == TaskDef.Kind.CourseRun)
                 StartCourseRun();
 
-            if (next.activatesNPCParent && level7NPCParent != null)
-                level7NPCParent.SetActive(true);
+            if (next.activateOnStart != null)
+                next.activateOnStart.SetActive(true);
 
             hoverTimer      = 0f;
             HoverProgress   = 0f;
@@ -680,8 +696,11 @@ namespace SimCore
                             : cw.hoverBox != null ? (Vector3?)cw.hoverBox.transform.position : null;
                     break;
                 case TaskDef.Kind.Land:
-                    NavigationTarget = driver?.spawnPoint != null
-                        ? (Vector3?)driver.spawnPoint.position : null;
+                    // Mid-mission landings set targetTransform; default is back at the pad
+                    NavigationTarget = t.targetTransform != null
+                        ? (Vector3?)t.targetTransform.position
+                        : driver?.spawnPoint != null
+                            ? (Vector3?)driver.spawnPoint.position : null;
                     break;
                 default:
                     NavigationTarget = null;
@@ -710,13 +729,10 @@ namespace SimCore
                 foreach (var r in level2Checkpoints)
                     if (r != null) r.gameObject.SetActive(false);
 
-            if (rescueNPCs != null)
-                foreach (var npc in rescueNPCs)
-                    if (npc != null) npc.Unboard();
+            foreach (var t in tasks)
+                if (t.activateOnStart != null) t.activateOnStart.SetActive(false);
 
-            if (level7NPCParent != null) level7NPCParent.SetActive(false);
-            if (level7NPCs != null)     level7NPCs.ResetBoarding();
-            if (driver != null)         driver.ResetPassengerMass();
+            BroadcastLevelReset();
 
             missionElapsed = 0f;
             TimeRemaining  = tasks.Length > 0 && tasks[0].taskTimeLimit > 0
@@ -758,6 +774,11 @@ namespace SimCore
             CurrentPhase  = Phase.Failed;
             IsHoverTask   = false;
             hoverZoneMarker?.gameObject.SetActive(false);
+
+            // Put the helicopter back on the pad right away — otherwise it keeps
+            // falling behind the result screen and crashes into the ground.
+            driver?.ResetToSpawnPoint();
+
             resultScreen?.ShowFailure(reason, defaultLevelNumber);
         }
 
