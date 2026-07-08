@@ -1,22 +1,67 @@
-# Node
+# --- Unity generated ---
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]serSettings/
+MemoryCaptures/
+Recordings/
+
+# Build outputs
+*.app/
+*_BurstDebugInformation_DoNotShip/
+*_BackUpThisFolder_ButDontShipItWithYourGame/
+
+# Crash dumps
+mono_crash.*.json
+sysinfo.txt
+*.stackdump
+
+# Generated localization tables — recreate via
+# Window > SuperHeli > Setup Localization Tables (see CLAUDE.md)
+Assets/Localization/
+Assets/Localization.meta
+
+# Third-party asset packs — not redistributable in a public repo.
+# Re-import from the Asset Store / Mixamo after cloning.
+Assets/MapMagic/
+Assets/MapMagic.meta
+Assets/TerrainSampleAssets/
+Assets/TerrainSampleAssets.meta
+Assets/NPC/
+Assets/NPC.meta
+Assets/Old Hangar/
+Assets/Old Hangar.meta
+Assets/Phantom Studios/
+Assets/Phantom Studios.meta
+Assets/Procedural Water Shader/
+Assets/Procedural Water Shader.meta
+Assets/Simple Water Shader HDRP/
+Assets/Simple Water Shader HDRP.meta
+Assets/Ultra Skybox Fog/
+Assets/Ultra Skybox Fog.meta
+Assets/Wildlife/
+Assets/Wildlife.meta
+
+# Terrain heightmap sources
+StartingTerrain.raw
+Assets/Levels/Hills02_Terrainmap.raw
+Assets/Levels/Hills02_Terrainmap.tiff
+Assets/Levels/Hills02_Heightmap.tiff
+Assets/Levels/LevelOneheightmap.raw
+
+# Node / Python
 node_modules/
 dist/
-build/
-
-# Python
 __pycache__/
 *.py[cod]
 env/
 venv/
 
-# General
-.DS_Store
-.env
-
-# IDE
+# IDE / OS
 .vscode/
 .idea/
-Assets/Levels/Hills02_Terrainmap.raw
-Assets/Levels/Hills02_Terrainmap.tiff
-Assets/Levels/Hills02_Heightmap.tiff
-Assets/Levels/LevelOneheightmap.raw
+.DS_Store
+.env
