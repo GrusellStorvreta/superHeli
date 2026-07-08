@@ -22,6 +22,14 @@ namespace SimCore
 
         private readonly MenuTheme _theme = new MenuTheme();
 
+        void Awake()
+        {
+            // Inspector wiring is easy to lose — TryAgain/ContinueToLevel silently
+            // do nothing without these references.
+            if (missionManager == null) missionManager = FindObjectOfType<MissionManager>();
+            if (driver == null)         driver         = FindObjectOfType<SimulatorDriver>();
+        }
+
         int ButtonCount => (_isSuccess && _nextLevel > 0) ? 2 : 2;
 
         public void ShowSuccess(int level)

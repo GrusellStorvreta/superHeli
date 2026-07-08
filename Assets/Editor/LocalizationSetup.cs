@@ -26,6 +26,8 @@ public static class LocalizationSetup
         { "menu.sound_on",      "SOUND   ON" },
         { "menu.sound_off",     "SOUND   OFF" },
         { "menu.volume",        "VOLUME   {0}%" },
+        { "menu.mode_simulation", "FLIGHT MODEL   SIMULATION" },
+        { "menu.mode_arcade",     "FLIGHT MODEL   ARCADE" },
         { "menu.level",         "LEVEL {0}" },
 
         // Pause menu

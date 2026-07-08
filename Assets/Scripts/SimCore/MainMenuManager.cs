@@ -30,7 +30,7 @@ namespace SimCore
 
         private int LevelSelectButtonCount => (_levelList?.Count ?? 3) + 1; // levels + back
         private int ButtonCount => _menuPhase == MenuPhase.Main     ? 4
-                                 : _menuPhase == MenuPhase.Settings ? 2
+                                 : _menuPhase == MenuPhase.Settings ? 3
                                  : LevelSelectButtonCount;
 
         public void ShowMenu()
@@ -116,7 +116,8 @@ namespace SimCore
             else if (_menuPhase == MenuPhase.Settings)
             {
                 if (_selectedIndex == 0) { GameSettings.SoundEnabled = !GameSettings.SoundEnabled; GameSettings.ApplyAudioSettings(); }
-                if (_selectedIndex == 1) GoBack();
+                if (_selectedIndex == 1) GameSettings.SimulationMode = !GameSettings.SimulationMode;
+                if (_selectedIndex == 2) GoBack();
             }
         }
 
@@ -168,6 +169,11 @@ namespace SimCore
                 }
                 if (missionHUD != null) missionHUD.enabled = true;
             }
+            else
+            {
+                // Free Flight: Level 7 NPCs hidden, instructor visible
+                if (missionManager != null) missionManager.ApplyDefaultCabinState();
+            }
         }
 
         // -------------------------------------------------------
@@ -185,7 +191,7 @@ namespace SimCore
             float panW = 380f;
             float gap  = 68f;
             float panH = _menuPhase == MenuPhase.Main     ? 460f
-                       : _menuPhase == MenuPhase.Settings ? 340f
+                       : _menuPhase == MenuPhase.Settings ? 410f
                        : 140f + gap * LevelSelectButtonCount + 30f;
             float px = (sw - panW) * 0.5f;
             float py = (sh - panH) * 0.5f;
@@ -240,7 +246,13 @@ namespace SimCore
                     GUI.Label(new Rect(bx, barY + 10f, btnW, 20f), Loc.Get("menu.volume", (int)(vol * 100f)), _theme.SubtitleStyle);
                 }
 
-                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), Loc.Get("menu.back"), _selectedIndex == 1)) GoBack();
+                string modeLabel = GameSettings.SimulationMode
+                    ? Loc.Get("menu.mode_simulation")
+                    : Loc.Get("menu.mode_arcade");
+                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), modeLabel, _selectedIndex == 1))
+                    GameSettings.SimulationMode = !GameSettings.SimulationMode;
+
+                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), Loc.Get("menu.back"), _selectedIndex == 2)) GoBack();
             }
         }
 

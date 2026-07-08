@@ -1,5 +1,8 @@
 using System.Collections;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace SimCore
 {
@@ -8,6 +11,11 @@ namespace SimCore
         [Header("Crash")]
         public float fadeDuration = 1.2f;
         public float holdDuration = 0.6f;
+
+        [Header("Rumble")]
+        public float rumbleLowMotor  = 1f;    // heavy low-frequency thump
+        public float rumbleHighMotor = 0.6f;  // sharper rattle on top
+        public float rumbleDuration  = 0.8f;  // fades out over this time
 
         [Header("Nice landing")]
         public float niceLandingHold = 2.0f;
@@ -53,6 +61,8 @@ namespace SimCore
             isCrashing    = true;
             showCrashText = true;
 
+            StartCoroutine(CrashRumble());
+
             // Freeze physics so helicopter doesn't tumble during fade
             var rb = GetComponent<Rigidbody>();
             if (rb != null) rb.isKinematic = true;
@@ -82,6 +92,24 @@ namespace SimCore
             }
             overlayAlpha = 0f;
             isCrashing   = false;
+        }
+
+        IEnumerator CrashRumble()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var gp = Gamepad.current;
+            if (gp == null) yield break;
+
+            for (float t = 0f; t < rumbleDuration; t += Time.unscaledDeltaTime)
+            {
+                float k = 1f - t / rumbleDuration; // decay from full shake to still
+                gp.SetMotorSpeeds(rumbleLowMotor * k, rumbleHighMotor * k);
+                yield return null;
+            }
+            gp.SetMotorSpeeds(0f, 0f);
+#else
+            yield break;
+#endif
         }
 
         IEnumerator NiceLandingSequence()
@@ -137,6 +165,17 @@ namespace SimCore
         void OnDestroy()
         {
             if (overlayTexture != null) Destroy(overlayTexture);
+            StopRumble();
+        }
+
+        void OnDisable() => StopRumble();
+
+        // Coroutines die silently with the object — without this the motors keep spinning.
+        static void StopRumble()
+        {
+#if ENABLE_INPUT_SYSTEM
+            Gamepad.current?.SetMotorSpeeds(0f, 0f);
+#endif
         }
     }
 }

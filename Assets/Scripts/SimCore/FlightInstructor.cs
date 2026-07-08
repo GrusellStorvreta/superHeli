@@ -94,6 +94,9 @@ namespace SimCore
 
         void OnLanding(LandingResult result)
         {
+            // Inactive (e.g. Level 7): a StartCoroutine here would throw and
+            // abort the remaining OnLanding subscribers.
+            if (!isActiveAndEnabled) return;
             if (!result.success) return;
             if (Random.value < clappingChanceLanding)
                 PlayClapping();

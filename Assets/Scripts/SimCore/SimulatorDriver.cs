@@ -13,6 +13,9 @@ namespace SimCore
         [Tooltip("Spawn the helicopter here on Start. Auto-finds 'SpawnPoint' in scene if unset.")]
         public Transform spawnPoint;
 
+        [Tooltip("Empty GO placed just below the main rotor hub. Sets the Rigidbody's center of mass so all rotation happens around the mast. Leave unset to keep Unity's auto-computed COM.")]
+        public Transform centerOfMassMarker;
+
         [Header("Input processing")]
         public float deadzone = 0.05f;
         public float smoothingTime = 0.05f;
@@ -26,6 +29,10 @@ namespace SimCore
         public Rigidbody rb;
 
         public float baseMass = 1000f;
+
+        [Header("Physics tuning")]
+        [Tooltip("All flight-model parameters. 'Simulation' is synced from GameSettings.SimulationMode each frame.")]
+        public SimulatorConfig config = new SimulatorConfig();
 
         private SimCore.Simulator simulator;
         private HeliInput heliInput;
@@ -59,6 +66,22 @@ namespace SimCore
             rb.useGravity = true;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
 
+            if (centerOfMassMarker != null)
+            {
+                // rb.centerOfMass ignores transform scale, so on a scaled rig
+                // InverseTransformPoint lands the COM far outside the hull.
+                // Set, verify against worldCenterOfMass, and fall back to the
+                // unscaled (rotation-only) mapping if the round trip is off.
+                rb.centerOfMass = rb.transform.InverseTransformPoint(centerOfMassMarker.position);
+                if ((rb.worldCenterOfMass - centerOfMassMarker.position).sqrMagnitude > 0.0001f)
+                    rb.centerOfMass = Quaternion.Inverse(rb.transform.rotation)
+                                      * (centerOfMassMarker.position - rb.transform.position);
+
+                float err = (rb.worldCenterOfMass - centerOfMassMarker.position).magnitude;
+                if (err > 0.05f)
+                    Debug.LogWarning($"[SimulatorDriver] COM hamnade {err:F2} m från markören — kontrollera hierarkin.");
+            }
+
             if (spawnPoint == null)
                 spawnPoint = GameObject.Find("SpawnPoint")?.transform;
 
@@ -68,7 +91,8 @@ namespace SimCore
                 transform.rotation = spawnPoint.rotation;
             }
 
-            simulator = new SimCore.Simulator();
+            if (config == null) config = new SimulatorConfig();
+            simulator = new SimCore.Simulator(config);
 
             heliInput = GetComponent<HeliInput>();
             if (heliInput == null)
@@ -177,6 +201,21 @@ namespace SimCore
         public void AddPassengerMass(float kg)  => rb.mass += kg;
         public void ResetPassengerMass()        => rb.mass = baseMass;
 
+        [ContextMenu("Log COM Info")]
+        void LogComInfo()
+        {
+            if (rb == null) { Debug.Log("[SimulatorDriver] Ingen Rigidbody tilldelad."); return; }
+            string marker = centerOfMassMarker != null
+                ? centerOfMassMarker.position.ToString("F3")
+                : "ej satt";
+            float delta = centerOfMassMarker != null
+                ? (rb.worldCenterOfMass - centerOfMassMarker.position).magnitude
+                : 0f;
+            Debug.Log($"[SimulatorDriver] COM local: {rb.centerOfMass.ToString("F3")}  " +
+                      $"world: {rb.worldCenterOfMass.ToString("F3")}  " +
+                      $"markör (world): {marker}  avvikelse: {delta:F3} m");
+        }
+
         private void ApplyReset()
         {
             if (spawnPoint == null) return;
@@ -205,11 +244,13 @@ namespace SimCore
                 return;
             }
 
+            config.simulation = GameSettings.SimulationMode;
+
             double dt = Time.fixedDeltaTime;
             simulator.UpdateActuators(controlEntityId, dt);
 
             Vector3 force  = simulator.ComputeForce(controlEntityId, rb.rotation, rb.velocity, rb.position.y);
-            Vector3 torque = simulator.ComputeTorque(controlEntityId, rb.rotation, rb.angularVelocity);
+            Vector3 torque = simulator.ComputeTorque(controlEntityId, rb.rotation, rb.velocity, rb.angularVelocity);
 
             rb.AddForce(force);
             rb.AddTorque(torque, ForceMode.Acceleration);

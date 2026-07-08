@@ -12,6 +12,13 @@ namespace SimCore
             set { UnityEngine.PlayerPrefs.SetInt("UnlockedLevels", value); UnityEngine.PlayerPrefs.Save(); }
         }
 
+        // Arcade = simplified physics (ETL, torque, weathervane etc. off). COM is always active.
+        public static bool SimulationMode
+        {
+            get => UnityEngine.PlayerPrefs.GetInt("SimulationMode", 1) == 1;
+            set { UnityEngine.PlayerPrefs.SetInt("SimulationMode", value ? 1 : 0); UnityEngine.PlayerPrefs.Save(); }
+        }
+
         public static bool SoundEnabled
         {
             get => UnityEngine.PlayerPrefs.GetInt("SoundEnabled", 1) == 1;
