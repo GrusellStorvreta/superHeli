@@ -1,0 +1,97 @@
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEngine;
+using System.IO;
+
+// Adds the NATIVEWEBSOCKET scripting define symbol to all BuildTargetGroups only if the
+// NativeWebSocket package is present in Packages/manifest.json. This avoids enabling the
+// symbol when the package isn't installed which would cause compile errors.
+[InitializeOnLoad]
+public static class DefineNativeWebSocketSymbol
+{
+    static DefineNativeWebSocketSymbol()
+    {
+        // Delay the call to avoid timing issues during domain reload
+        EditorApplication.delayCall += AddDefineIfPackagePresent;
+    }
+
+    private static void AddDefineIfPackagePresent()
+    {
+        const string symbol = "NATIVEWEBSOCKET";
+
+        try
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string manifestPath = Path.Combine(projectRoot, "Packages", "manifest.json");
+            if (!File.Exists(manifestPath))
+            {
+                Debug.Log("[DefineNativeWebSocketSymbol] Packages/manifest.json not found; skipping define.");
+                return;
+            }
+
+            string manifest = File.ReadAllText(manifestPath);
+            if (!manifest.Contains("com.endel.nativewebsocket"))
+            {
+                Debug.Log("[DefineNativeWebSocketSymbol] NativeWebSocket package not present in manifest.json; skipping define.");
+                return;
+            }
+
+            // Ensure package files are present in Packages/ or Library/PackageCache before enabling the define
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string packagesDir = Path.Combine(projectRoot, "Packages", "com.endel.nativewebsocket");
+            string cachePattern = Path.Combine(projectRoot, "Library", "PackageCache", "com.endel.nativewebsocket@");
+            bool packagePresent = Directory.Exists(packagesDir);
+            if (!packagePresent)
+            {
+                // Check Library/PackageCache for installed package
+                try
+                {
+                    var dir = new System.IO.DirectoryInfo(Path.Combine(projectRoot, "Library", "PackageCache"));
+                    if (dir.Exists)
+                    {
+                        foreach (var d in dir.GetDirectories("com.endel.nativewebsocket*@*", System.IO.SearchOption.TopDirectoryOnly))
+                        {
+                            packagePresent = true;
+                            break;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (!packagePresent)
+            {
+                Debug.Log("[DefineNativeWebSocketSymbol] NativeWebSocket package not yet present in Packages/ or Library/PackageCache; skipping define.");
+                return;
+            }
+
+            foreach (BuildTargetGroup group in System.Enum.GetValues(typeof(BuildTargetGroup)))
+            {
+                if (group == BuildTargetGroup.Unknown)
+                    continue;
+
+                try
+                {
+                    string defines = PlayerSettings.GetScriptingDefineSymbolsForGroup(group) ?? string.Empty;
+                    var list = new System.Collections.Generic.List<string>(defines.Split(new char[] {';'}, System.StringSplitOptions.RemoveEmptyEntries));
+                    if (!list.Contains(symbol))
+                    {
+                        list.Add(symbol);
+                        string newDefines = string.Join(";", list.ToArray());
+                        PlayerSettings.SetScriptingDefineSymbolsForGroup(group, newDefines);
+                        Debug.Log($"[DefineNativeWebSocketSymbol] Added '{symbol}' to {group}");
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[DefineNativeWebSocketSymbol] Skipping {group}: {ex.Message}");
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning("[DefineNativeWebSocketSymbol] Error while checking manifest.json: " + ex.Message);
+        }
+    }
+}
+#endif
