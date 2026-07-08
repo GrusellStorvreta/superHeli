@@ -1,0 +1,69 @@
+{
+  "id": "b0f58b4d-bb58-4393-a685-35b0ab307d50",
+  "createdAt": "2026-06-14T12:33:50.610Z",
+  "lastActiveAt": "2026-06-14T12:50:13.409Z",
+  "messages": [
+    {
+      "role": "system",
+      "content": "🏗️ No team yet — casting one based on your project...",
+      "timestamp": "2026-06-14T12:35:23.582Z"
+    },
+    {
+      "role": "agent",
+      "agentName": "coordinator",
+      "content": "Team proposed:\n\n🏗️  Danny      — Lead            Architecture, Unity setup, decisions\n👤  Rusty      — Gameplay Dev    Flight physics, helicopter mechanics\n👤  Linus      — Graphics Dev    Unity rendering, visuals, Mac build\n👤  Basher     — Systems Dev     Input handling, audio, effects\n📋  Scribe     — (silent)        Memory, decisions, session logs\n🔄  Ralph      — (monitor)       Work queue, backlog, keep-alive\n\nUniverse: Ocean's Eleven",
+      "timestamp": "2026-06-14T12:35:28.250Z"
+    },
+    {
+      "role": "system",
+      "content": "Look good? Type **y** to confirm or **n** to cancel.",
+      "timestamp": "2026-06-14T12:35:28.270Z"
+    },
+    {
+      "role": "system",
+      "content": "Cast cancelled. Describe what you're building to try again.",
+      "timestamp": "2026-06-14T12:36:10.314Z"
+    },
+    {
+      "role": "system",
+      "content": "🏗️ No team yet — casting one based on your project...",
+      "timestamp": "2026-06-14T12:36:47.852Z"
+    },
+    {
+      "role": "system",
+      "content": "⚠ Could not parse a team proposal from the model response.\n\nTry again, or run: squad init \"describe your project\"",
+      "timestamp": "2026-06-14T12:37:30.639Z"
+    },
+    {
+      "role": "system",
+      "content": "🏗️ No team yet — casting one based on your project...",
+      "timestamp": "2026-06-14T12:38:34.237Z"
+    },
+    {
+      "role": "agent",
+      "agentName": "coordinator",
+      "content": "Team proposed:\n\n🏗️  Danny      — Lead            Architecture, Unity setup, decisions\n👤  Rusty      — Physics Dev     Helicopter physics, flight model\n👤  Linus      — Systems Dev     Controls, input, UI\n👤  Basher     — Environment Dev Terrain, assets, effects\n📋  Scribe     — (silent)        Memory, decisions, session logs\n🔄  Ralph      — (monitor)       Work queue, backlog, keep-alive\n\nUniverse: Ocean's Eleven",
+      "timestamp": "2026-06-14T12:38:37.479Z"
+    },
+    {
+      "role": "system",
+      "content": "Look good? Type **y** to confirm or **n** to cancel.",
+      "timestamp": "2026-06-14T12:38:37.490Z"
+    },
+    {
+      "role": "system",
+      "content": "✅ Team hired! 6 members created.",
+      "timestamp": "2026-06-14T12:38:57.255Z"
+    },
+    {
+      "role": "system",
+      "content": "📌 Routing your message to the team now...",
+      "timestamp": "2026-06-14T12:38:57.262Z"
+    },
+    {
+      "role": "system",
+      "content": "⚠ Team casting failed: Timeout after 600000ms waiting for session.idle\nTry again or edit .squad/team.md directly.",
+      "timestamp": "2026-06-14T12:48:57.294Z"
+    }
+  ]
+}
