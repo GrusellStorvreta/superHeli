@@ -45,12 +45,13 @@ Assets/Ultra Skybox Fog.meta
 Assets/Wildlife/
 Assets/Wildlife.meta
 
-# Terrain heightmap sources
+# Terrain heightmap sources — baked into the TerrainData assets,
+# never committed
 StartingTerrain.raw
-Assets/Levels/Hills02_Terrainmap.raw
-Assets/Levels/Hills02_Terrainmap.tiff
-Assets/Levels/Hills02_Heightmap.tiff
-Assets/Levels/LevelOneheightmap.raw
+Assets/**/*.raw
+Assets/**/*.raw.meta
+Assets/**/*.tiff
+Assets/**/*.tiff.meta
 
 # Node / Python
 node_modules/
