@@ -53,6 +53,10 @@ Assets/**/*.raw.meta
 Assets/**/*.tiff
 Assets/**/*.tiff.meta
 
+# Image editor source files — export PNGs into the repo, keep sources out
+*.xcf
+*.xcf.meta
+
 # Node / Python
 node_modules/
 dist/
