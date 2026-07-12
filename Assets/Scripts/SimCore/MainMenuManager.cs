@@ -26,7 +26,11 @@ namespace SimCore
 
         private readonly MenuTheme _theme = new MenuTheme();
 
-        private List<(int num, string name)> _levelList;
+        // Name is a resolver, not a cached string: BuildLevelList runs in Start()
+        // before Unity's localization finishes initializing, so resolving names
+        // eagerly there would freeze the raw keys. OnGUI calls this each frame,
+        // by which time Loc.Get returns the real localized text.
+        private List<(int num, System.Func<string> name)> _levelList;
 
         private int LevelSelectButtonCount => (_levelList?.Count ?? 3) + 1; // levels + back
         private int ButtonCount => _menuPhase == MenuPhase.Main     ? 4
@@ -48,18 +52,21 @@ namespace SimCore
 
         void BuildLevelList()
         {
-            _levelList = new List<(int, string)>
+            _levelList = new List<(int, System.Func<string>)>
             {
-                (1, Loc.Get("menu.level_1")),
-                (2, Loc.Get("menu.level_2")),
+                (1, () => Loc.Get("menu.level_1")),
+                (2, () => Loc.Get("menu.level_2")),
             };
 
             if (missionManager != null && missionManager.courses != null)
                 foreach (var c in missionManager.courses)
                     if (c != null)
-                        _levelList.Add((c.levelNumber, c.courseName.ToUpper()));
+                    {
+                        var course = c; // capture per iteration, not the loop variable
+                        _levelList.Add((course.levelNumber, () => course.courseName.ToUpper()));
+                    }
 
-            _levelList.Add((7, Loc.Get("menu.level_7")));
+            _levelList.Add((7, () => Loc.Get("menu.level_7")));
             _levelList.Sort((a, b) => a.num.CompareTo(b.num));
         }
 
@@ -221,7 +228,8 @@ namespace SimCore
                 {
                     var lvl    = _levelList[i];
                     bool locked = u < lvl.num;
-                    string lbl  = locked ? $"{lvl.name}  \U0001F512" : lvl.name;
+                    string name = lvl.name();
+                    string lbl  = locked ? $"{name}  \U0001F512" : name;
                     if (_theme.DrawButton(new Rect(bx, by + gap * i, btnW, btnH), lbl, _selectedIndex == i, locked))
                         if (!locked) StartGame(GameSettings.Mode.Mission, lvl.num);
                 }
