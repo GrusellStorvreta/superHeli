@@ -50,8 +50,8 @@ namespace SimCore
         {
             _levelList = new List<(int, string)>
             {
-                (1, Loc.Get("menu.level", 1)),
-                (2, Loc.Get("menu.level", 2)),
+                (1, Loc.Get("menu.level_1")),
+                (2, Loc.Get("menu.level_2")),
             };
 
             if (missionManager != null && missionManager.courses != null)
@@ -59,7 +59,7 @@ namespace SimCore
                     if (c != null)
                         _levelList.Add((c.levelNumber, c.courseName.ToUpper()));
 
-            _levelList.Add((7, Loc.Get("menu.level", 7)));
+            _levelList.Add((7, Loc.Get("menu.level_7")));
             _levelList.Sort((a, b) => a.num.CompareTo(b.num));
         }
 

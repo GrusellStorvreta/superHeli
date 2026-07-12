@@ -28,7 +28,10 @@ public static class LocalizationSetup
         { "menu.volume",        "VOLUME   {0}%" },
         { "menu.mode_simulation", "FLIGHT MODEL   SIMULATION" },
         { "menu.mode_arcade",     "FLIGHT MODEL   ARCADE" },
-        { "menu.level",         "LEVEL {0}" },
+        { "menu.level",         "LEVEL {0}" },   // generic fallback for unnamed levels
+        { "menu.level_1",       "HOVER TRAINING" },
+        { "menu.level_2",       "PRECISION FLIGHT" },
+        { "menu.level_7",       "MOUNTAIN RESCUE" },
 
         // Pause menu
         { "pause.title",        "PAUSED" },
