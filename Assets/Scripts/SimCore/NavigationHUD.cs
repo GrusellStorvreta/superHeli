@@ -70,7 +70,7 @@ namespace SimCore
             float ax    = px + panW - 44f;
             float ay    = py + (panH - 32f) * 0.5f;
             var   pivot = new Vector2(ax + 16f, ay + 16f);
-            GUIUtility.RotateAroundPivot(180f - relBrg, pivot);
+            GUIUtility.RotateAroundPivot(180f + relBrg, pivot);
             GUI.DrawTexture(new Rect(ax, ay, 32f, 32f), arrowTex);
             GUI.matrix = Matrix4x4.identity;
         }
