@@ -85,3 +85,22 @@ After cloning, verify in each scene that:
    - Speech / crackle AudioSources on FlightInstructor → `Interior`
 3. `FlightInstructor.Speech` references the `SpeechPlayer` component
 
+## Simulation mode tuning
+
+Simulation mode's flight model (`SimulatorConfig` in `Assets/Scripts/SimCore/Simulator.cs`)
+gets tuned iteratively against recorded flight data, since neither of us is a licensed
+helicopter pilot to calibrate against by feel alone.
+
+**Tools:**
+- `Assets/Scripts/SimCore/BlackBoxRecorder.cs` — attach next to `SimulatorDriver` on the
+  helicopter. Samples attitude/rates/velocity/controls at 10 Hz, appends a CSV every 10 s
+  to `~/Library/Application Support/DefaultCompany/superHeli/BlackBox/` (only while
+  `GameSettings.SimulationMode` is on). Key column: `sideslip` — angle between nose
+  heading and actual travel direction; near 0 = coordinated turn.
+- `docs/tuning-log.md` — dated log of tuning sessions (goal, black box files used,
+  findings, config changes, next steps). Every tuning session gets a new entry there
+  following the template at the top of the file.
+
+When starting a new tuning session: check `docs/tuning-log.md` for the most recent
+entry and open questions before making changes.
+

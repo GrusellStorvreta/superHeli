@@ -32,6 +32,10 @@ namespace SimCore
 
         public float weathervaneTorque      = 0.02f; // deg/s² per (m/s · deg sideslip) — airflow
                                                      // pulls the nose toward the flight path
+        public float weathervaneDamping     = 0.05f; // deg/s² per (m/s · deg/s yaw rate) — counters
+                                                     // the vane's own yaw rate so it settles into
+                                                     // the turn instead of overshooting past zero
+                                                     // sideslip and oscillating (undamped spring)
         public float weathervaneMax         = 45f;   // deg/s² cap on the vane torque
         public float pedalAuthorityMinSpeed = 6f;    // m/s — full pedal authority below
         public float pedalAuthorityMaxSpeed = 20f;   // m/s — authority fully reduced here
@@ -232,8 +236,10 @@ namespace SimCore
             if (flatFwd.sqrMagnitude > 0.001f && flatVel.sqrMagnitude > 1f)
             {
                 float sideslipDeg = Vector3.SignedAngle(flatFwd, flatVel, Vector3.up);
-                float vaneDegSS   = Mathf.Clamp(_cfg.weathervaneTorque * hSpeed * sideslipDeg,
-                                                -_cfg.weathervaneMax, _cfg.weathervaneMax);
+                float yawRateDeg  = angularVelocity.y * Mathf.Rad2Deg;
+                float vaneDegSS   = _cfg.weathervaneTorque * hSpeed * sideslipDeg
+                                   - _cfg.weathervaneDamping * hSpeed * yawRateDeg;
+                vaneDegSS = Mathf.Clamp(vaneDegSS, -_cfg.weathervaneMax, _cfg.weathervaneMax);
                 vane = yawAxis * (vaneDegSS * toRad);
             }
 
