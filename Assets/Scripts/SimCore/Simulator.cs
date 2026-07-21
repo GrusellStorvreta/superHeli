@@ -20,6 +20,10 @@ namespace SimCore
                                          // MD500 main rotor spins CCW seen from above → fuselage reaction
                                          // yaws the nose right; pilot compensates with left pedal.
                                          // Trimmed at hover collective (0.5) so hover needs no constant pedal.
+        public float rotorTorqueDamping = 0.4f; // deg/s² per deg/s yaw rate — smooths the yaw kick
+                                         // from a power change so it needs steady pedal instead of
+                                         // sharp reactive stabs, which (while pitched) couple into
+                                         // roll and cause a lateral slide
 
         public float etlStartSpeed  = 4f;    // m/s — translational lift starts here (~8 kt)
         public float etlFullSpeed   = 13f;   // m/s — lift bonus saturated (~25 kt)
@@ -29,17 +33,31 @@ namespace SimCore
                                              // sets steady-state speed per stick position:
                                              // v = cyclic · cyclicTorque / flapbackTorque,
                                              // so full forward stick ≈ 78 m/s = 152 kt (MD500E Vne)
+        public float flapbackDamping = 0.3f; // deg/s² per (m/s · deg/s pitch rate) — counters
+                                             // the flapback torque's own pitch rate so releasing
+                                             // the cyclic at speed settles into a steady nose-up
+                                             // drift (~flapbackTorque/flapbackDamping deg/s)
+                                             // instead of an unchecked runaway
+        public float flapbackMax    = 60f;   // deg/s² cap on the flapback torque
 
-        public float weathervaneTorque      = 0.02f; // deg/s² per (m/s · deg sideslip) — airflow
-                                                     // pulls the nose toward the flight path
-        public float weathervaneDamping     = 0.05f; // deg/s² per (m/s · deg/s yaw rate) — counters
+        public float weathervaneTorque      = 0.05f; // deg/s² per (m/s · deg sideslip) — airflow
+                                                     // pulls the nose toward the flight path. Sized
+                                                     // so the nose can track the turn rate a bank
+                                                     // angle actually produces (g·tan(roll)/v) instead
+                                                     // of lagging behind it (large sustained sideslip)
+        public float weathervaneDamping     = 0.078f; // deg/s² per (m/s · deg/s yaw rate) — counters
                                                      // the vane's own yaw rate so it settles into
                                                      // the turn instead of overshooting past zero
                                                      // sideslip and oscillating (undamped spring)
         public float weathervaneMax         = 45f;   // deg/s² cap on the vane torque
         public float pedalAuthorityMinSpeed = 6f;    // m/s — full pedal authority below
         public float pedalAuthorityMaxSpeed = 20f;   // m/s — authority fully reduced here
-        public float pedalAuthorityAtSpeed  = 0.3f;  // fraction of pedal torque left in cruise
+        public float pedalAuthorityAtSpeed  = 0.7f;  // fraction of pedal torque left in cruise —
+                                                     // kept above rotorTorque/pedalTorque (0.625)
+                                                     // so full pedal can still counter a full-
+                                                     // deflection collective's yaw reaction; real
+                                                     // tail rotors keep that margin through the
+                                                     // speed range (unlike this sim, previously)
         public float sideslipDrag           = 40f;   // extra N·s/m on body-lateral velocity —
                                                      // the hull is a slab when flying sideways
 
@@ -219,15 +237,26 @@ namespace SimCore
             if (!_cfg.simulation)
                 return inputTorque + dampingTorque;
 
+            float yawRateDeg = angularVelocity.y * Mathf.Rad2Deg;
+
             // Main rotor torque reaction: positive yaw (nose right) grows with
-            // collective above hover trim, negative below.
+            // collective above hover trim, negative below. Damped by yaw rate so a
+            // sustained power change needs steady pedal, not sharp reactive stabs.
             float collectiveDelta = ((float)a.collective - 0.5f) * 2f;
-            Vector3 rotorReaction = yawAxis * (collectiveDelta * _cfg.rotorTorque * toRad);
+            float rotorReactionDegSS = collectiveDelta * _cfg.rotorTorque
+                                      - _cfg.rotorTorqueDamping * yawRateDeg;
+            Vector3 rotorReaction = yawAxis * (rotorReactionDegSS * toRad);
 
             // Flapback: forward airspeed pitches the nose up (negative pitch torque),
             // so the ship levels itself at speed and needs forward cyclic to cruise.
-            float fwdSpeed = Mathf.Max(0f, Vector3.Dot(velocity, rotation * Vector3.forward));
-            Vector3 flapback = pitchAxis * (-fwdSpeed * _cfg.flapbackTorque * toRad);
+            // Damped by pitch rate so releasing the cyclic at speed settles into a
+            // steady drift instead of an unchecked pitch-up runaway.
+            float fwdSpeed     = Mathf.Max(0f, Vector3.Dot(velocity, rotation * Vector3.forward));
+            float pitchRateDeg = Vector3.Dot(angularVelocity, pitchAxis) * Mathf.Rad2Deg;
+            float flapbackDegSS = -fwdSpeed * _cfg.flapbackTorque
+                                 - _cfg.flapbackDamping * fwdSpeed * pitchRateDeg;
+            flapbackDegSS = Mathf.Clamp(flapbackDegSS, -_cfg.flapbackMax, _cfg.flapbackMax);
+            Vector3 flapback = pitchAxis * (flapbackDegSS * toRad);
 
             // Weathervane: airflow yaws the nose toward the horizontal flight path.
             Vector3 vane    = Vector3.zero;
@@ -236,7 +265,6 @@ namespace SimCore
             if (flatFwd.sqrMagnitude > 0.001f && flatVel.sqrMagnitude > 1f)
             {
                 float sideslipDeg = Vector3.SignedAngle(flatFwd, flatVel, Vector3.up);
-                float yawRateDeg  = angularVelocity.y * Mathf.Rad2Deg;
                 float vaneDegSS   = _cfg.weathervaneTorque * hSpeed * sideslipDeg
                                    - _cfg.weathervaneDamping * hSpeed * yawRateDeg;
                 vaneDegSS = Mathf.Clamp(vaneDegSS, -_cfg.weathervaneMax, _cfg.weathervaneMax);
