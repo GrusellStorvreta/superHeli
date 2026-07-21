@@ -48,6 +48,7 @@ namespace SimCore
         public Vector3 LastBodyPosition => rb != null ? rb.position : transform.position;
         public Quaternion LastBodyRotation => rb != null ? rb.rotation : transform.rotation;
         public Vector3 LastBodyVelocity => rb != null ? rb.velocity : Vector3.zero;
+        public Vector3 LastBodyAngularVelocity => rb != null ? rb.angularVelocity : Vector3.zero;
 
         private IWebSocketClient websocketClient = new NoopWebSocketClient();
         private bool pendingReset = false;
