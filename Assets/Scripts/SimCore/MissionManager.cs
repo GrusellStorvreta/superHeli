@@ -138,13 +138,7 @@ namespace SimCore
             // Auto-starting here would race the menu's disable and run whatever level the
             // Inspector happens to hold — including Level 7's instructor deactivation.
             if (FindObjectOfType<MainMenuManager>() != null) return;
-            if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
-            landingChecker = FindObjectOfType<LandingChecker>();
-            if (landingChecker != null) landingChecker.OnLanding += OnLanding;
-            _crashHandler = FindObjectOfType<CrashHandler>();
-            if (_crashHandler != null) _crashHandler.OnCrashReset += HandleCrashReset;
-            BuildLevel();
-            StartMission();
+            Initialize(defaultLevelNumber);
         }
 
         public void Initialize(int level)
@@ -152,10 +146,19 @@ namespace SimCore
             _initializedExternally = true;
             defaultLevelNumber = level;
             if (driver == null) driver = FindObjectOfType<SimulatorDriver>();
+            if (resultScreen == null)
+            {
+                resultScreen = FindObjectOfType<MissionResultScreen>();
+                if (resultScreen == null)
+                    Debug.LogWarning("[MissionManager] No MissionResultScreen found in scene — Success/Fail screens won't show.");
+            }
             if (landingChecker == null)
             {
                 landingChecker = FindObjectOfType<LandingChecker>();
-                if (landingChecker != null) landingChecker.OnLanding += OnLanding;
+                if (landingChecker != null)
+                    landingChecker.OnLanding += OnLanding;
+                else
+                    Debug.LogWarning("[MissionManager] No LandingChecker found in scene — mission landing detection disabled.");
             }
             if (_crashHandler == null)
             {
@@ -204,7 +207,7 @@ namespace SimCore
                 new TaskDef { kind = TaskDef.Kind.ClimbToAGL, targetAglFt = 100f,
                               instruction = Loc.Get("instr.climb_100") },
                 new TaskDef { kind = TaskDef.Kind.HoverAtAGL, targetAglFt = 100f,
-                              hoverDuration = 5f, maxDeviationFt = 3f,
+                              hoverDuration = 5f, maxDeviationFt = 8f,
                               instruction   = Loc.Get("instr.hover_100") },
                 new TaskDef { kind = TaskDef.Kind.Land,
                               instruction = Loc.Get("instr.land") },
@@ -459,16 +462,26 @@ namespace SimCore
         void StartMission()
         {
             ApplyEnvironment(_environment);
+            CurrentPhase = Phase.Running;
+            ResetTaskState();
 
-            if (level2Checkpoints != null)
-                foreach (var r in level2Checkpoints)
-                    if (r != null) r.gameObject.SetActive(false);
+            // Level 7 swaps the instructor for the rescue NPCs; all other levels keep him seated
+            instructorObject?.SetActive(defaultLevelNumber != 7);
+            level7NPCParent?.SetActive(false);   // re-activated by the rescue-zone Land task
 
+            OnMissionStarted?.Invoke();
+        }
+
+        // Shared by StartMission(), HandleCrashReset(), and FailMission() — every
+        // path that puts the mission back at task 0 needs the same bookkeeping
+        // reset. Each caller layers only what's genuinely different on top
+        // (environment/instructor setup for a cold start; a shown result screen
+        // for a fail) and is responsible for unsubscribing the current checkpoint
+        // itself first if needed — that requires tasks/taskIdx still in sync,
+        // which isn't true for StartMission() switching to a freshly-built level.
+        void ResetTaskState()
+        {
             taskIdx           = 0;
-            TimeRemaining     = tasks.Length > 0 && tasks[0].taskTimeLimit > 0
-                                    ? tasks[0].taskTimeLimit
-                                    : timeLimit;
-            missionElapsed    = 0f;
             hoverTimer        = 0f;
             HoverProgress     = 0f;
             HoverInZone       = false;
@@ -476,22 +489,27 @@ namespace SimCore
             landingReceived   = false;
             _checkpointPassed = false;
             _courseComplete   = false;
-            CurrentPhase      = Phase.Running;
             hoverZoneMarker?.gameObject.SetActive(false);
 
-            // Initialize first task if it's a course run
+            if (level2Checkpoints != null)
+                foreach (var r in level2Checkpoints)
+                    if (r != null) r.gameObject.SetActive(false);
+
+            foreach (var t in tasks)
+                if (t.activateOnStart != null) t.activateOnStart.SetActive(false);
+
+            BroadcastLevelReset(); // e.g. Try Again after time-out must clear boarded weight
+
+            missionElapsed = 0f;
+            TimeRemaining  = tasks.Length > 0 && tasks[0].taskTimeLimit > 0
+                                ? tasks[0].taskTimeLimit
+                                : timeLimit;
+
             if (tasks.Length > 0 && tasks[0].kind == TaskDef.Kind.CourseRun)
                 StartCourseRun();
 
             RefreshInstruction();
             UpdateNavigationTarget();
-
-            // Level 7 swaps the instructor for the rescue NPCs; all other levels keep him seated
-            instructorObject?.SetActive(defaultLevelNumber != 7);
-            level7NPCParent?.SetActive(false);   // re-activated by the rescue-zone Land task
-            BroadcastLevelReset();               // Try Again after time-out must clear boarded weight
-
-            OnMissionStarted?.Invoke();
         }
 
         // Default cabin for Free Flight: instructor in the passenger seat,
@@ -516,6 +534,13 @@ namespace SimCore
         {
             if (CurrentPhase != Phase.Running) return;
             if (driver == null) { driver = FindObjectOfType<SimulatorDriver>(); return; }
+
+            // Don't evaluate tasks or run the clock against physics state that's
+            // mid-reset (a crash-reset resets task bookkeeping before the physical
+            // teleport lands) or while the player has no control during a crash
+            // sequence — see SimulatorDriver.IsResetPending / CrashHandler.IsCrashing.
+            if (driver.IsResetPending) return;
+            if (_crashHandler != null && _crashHandler.IsCrashing) return;
 
             missionElapsed += Time.deltaTime;
             TimeRemaining  -= Time.deltaTime;
@@ -717,33 +742,7 @@ namespace SimCore
             UnsubscribeCurrentCheckpoint();
             UnsubscribeFromCurrentCourseWaypoint();
 
-            taskIdx           = 0;
-            hoverTimer        = 0f;
-            HoverProgress     = 0f;
-            HoverInZone       = false;
-            IsHoverTask       = false;
-            landingReceived   = false;
-            _checkpointPassed = false;
-
-            if (level2Checkpoints != null)
-                foreach (var r in level2Checkpoints)
-                    if (r != null) r.gameObject.SetActive(false);
-
-            foreach (var t in tasks)
-                if (t.activateOnStart != null) t.activateOnStart.SetActive(false);
-
-            BroadcastLevelReset();
-
-            missionElapsed = 0f;
-            TimeRemaining  = tasks.Length > 0 && tasks[0].taskTimeLimit > 0
-                                ? tasks[0].taskTimeLimit
-                                : timeLimit;
-
-            if (_activeCourse != null && tasks[0].kind == TaskDef.Kind.CourseRun)
-                StartCourseRun();
-
-            RefreshInstruction();
-            UpdateNavigationTarget();
+            ResetTaskState();
         }
 
         void OnLanding(LandingResult result)
@@ -752,7 +751,17 @@ namespace SimCore
             if (!result.success) return;
 
             if (tasks[taskIdx].kind == TaskDef.Kind.Land)
+            {
                 landingReceived = true;
+                return;
+            }
+
+            // Landing while a non-Land task is still active used to be silently
+            // ignored — the mission just sat stuck evaluating that task against
+            // an on-the-ground position it could never satisfy. Fail immediately
+            // instead, with a reason naming what wasn't finished.
+            string reason = $"{Loc.Get("result.landed_early")}\n{tasks[taskIdx].instruction}";
+            FailMission(reason);
         }
 
         void Succeed()
@@ -771,9 +780,20 @@ namespace SimCore
         void Fail()
         {
             string reason = $"{Loc.Get("result.timesup")}\n{tasks[taskIdx].instruction}";
-            CurrentPhase  = Phase.Failed;
-            IsHoverTask   = false;
-            hoverZoneMarker?.gameObject.SetActive(false);
+            FailMission(reason);
+        }
+
+        // Shared by Fail() (timeout) and OnLanding()'s premature-landing branch —
+        // both need the exact same rewind as a mid-course crash (HandleCrashReset),
+        // just with a result screen shown at the end instead of resuming Running.
+        void FailMission(string reason)
+        {
+            CurrentPhase = Phase.Failed;
+
+            UnsubscribeCurrentCheckpoint();
+            UnsubscribeFromCurrentCourseWaypoint();
+
+            ResetTaskState();
 
             // Put the helicopter back on the pad right away — otherwise it keeps
             // falling behind the result screen and crashes into the ground.

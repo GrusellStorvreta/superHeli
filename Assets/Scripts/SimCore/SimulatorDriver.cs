@@ -50,6 +50,13 @@ namespace SimCore
         public Vector3 LastBodyVelocity => rb != null ? rb.velocity : Vector3.zero;
         public Vector3 LastBodyAngularVelocity => rb != null ? rb.angularVelocity : Vector3.zero;
 
+        // True from the moment ResetToSpawnPoint() is called until the teleport is
+        // actually applied on the next FixedUpdate. Other scripts that read live
+        // position/velocity for their own state logic (mission task completion,
+        // NPC boarding checks, ...) should skip that logic while this is true —
+        // otherwise they can act on a position that hasn't been reset yet.
+        public bool IsResetPending => pendingReset;
+
         private IWebSocketClient websocketClient = new NoopWebSocketClient();
         private bool pendingReset = false;
 

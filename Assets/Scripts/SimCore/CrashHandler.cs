@@ -27,6 +27,12 @@ namespace SimCore
 
         public event System.Action OnCrashReset;
 
+        // True for the whole freeze/fade/hold/fade-back sequence — the player has
+        // no control this whole time. Other scripts that run a mission/gameplay
+        // clock should pause it while this is true rather than let it run down
+        // during a crash the player couldn't have prevented.
+        public bool IsCrashing => isCrashing;
+
         private float overlayAlpha     = 0f;
         private float niceLandingAlpha = 0f;
         private bool  showCrashText    = false;

@@ -50,6 +50,11 @@ namespace SimCore
         {
             if (_driver == null) { _driver = FindObjectOfType<SimulatorDriver>(); return; }
 
+            // CheckLanding()/WalkSvenToHelicopter() read the helicopter's live
+            // position/velocity — skip a frame rather than act on a position that
+            // hasn't caught up yet after a reset was requested (crash, retry, ...).
+            if (_driver.IsResetPending) return;
+
             CycleNilsAnimation();
 
             switch (_state)
