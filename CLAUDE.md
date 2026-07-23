@@ -104,3 +104,69 @@ helicopter pilot to calibrate against by feel alone.
 When starting a new tuning session: check `docs/tuning-log.md` for the most recent
 entry and open questions before making changes.
 
+## AI flight coach & Lesson mode
+
+### Architecture
+
+`ICoachOutput` is the seam between coach analysis and however a comment reaches
+the player (`Say(string)`). Two producers, two displays, sharing that seam:
+
+| Component | Role |
+|---|---|
+| `FlightCoachAI` | Passive coach — every `chunkInterval` seconds, sends the last buffered telemetry chunk to Claude for general commentary. |
+| `FlightCoachTester` | Cycles canned phrases through `ICoachOutput` — no API calls, for testing the display pipeline for free. |
+| `FlightTaskCoachAI` | Lesson-mode coach — cycles a sequential, in-code list of maneuvers, each with its own timing window; buffers telemetry for that window, then asks Claude to judge the attempt against the *assigned* task. |
+| `HudCoachOutput` | Bottom-left amber panel. Displays whatever `Say()` is called with (coach commentary or task feedback). Panel height auto-sizes to the message (`minPanelHeight`/`maxPanelHeight`), so keep replies short. |
+| `LessonHUD` | Top-center bar (mission-instruction style) showing `FlightTaskCoachAI.CurrentTaskText` + `TimeRemaining`. Self-gates on `coach.enabled` — inert outside Lesson mode. |
+
+Both AI coaches only sample/send while `GameSettings.SimulationMode` is on
+(Arcade physics isn't what real telemetry coaching should be judging), and both
+require `ANTHROPIC_API_KEY` in the environment — missing it disables the
+component with a `Debug.LogWarning`, not a crash. GUI apps on macOS (Unity
+Editor launched from Dock/Finder) don't inherit shell-profile exports — launch
+the Editor from a terminal where the var is exported, or
+`launchctl setenv ANTHROPIC_API_KEY "..."` to reach GUI-launched apps too.
+
+**Model:** both default to `claude-haiku-4-5-20251001`. Do **not** add an
+`output_config`/`effort` field to the request — that parameter is only
+supported by reasoning-capable models (e.g. Opus); on Haiku it's an
+HTTP 400 (`"This model does not support the effort parameter"`).
+
+**Logging:** both coaches append plaintext transcripts under
+`~/Library/Application Support/DefaultCompany/superHeli/BlackBox/Coaching/`
+(sibling to `BlackBoxRecorder`'s CSV flight logs) — `coaching_<timestamp>.txt`
+for `FlightCoachAI`'s running commentary, `tasks_<timestamp>.txt` for
+`FlightTaskCoachAI`'s task/feedback pairs.
+
+### Lesson mode
+
+`GameSettings.Mode` gained a third value, `Lesson`, alongside `FreeFlight` and
+`Mission` — a menu entry between Missions and Settings. It reuses Free
+Flight's open world (no checkpoints/timer), but `MainMenuManager` hands the
+shared `HudCoachOutput` to `FlightTaskCoachAI` for the duration: whichever
+passive coach (`FlightCoachAI`/`FlightCoachTester`) is enabled gets suspended
+on entry and restored to its prior enabled state on exit, rather than forced
+back on.
+
+Current task list (sequential, defined in-code in `FlightTaskCoachAI.cs` —
+an Inspector-editable/reorderable list is a natural next step if needed):
+
+| id | Task | Window |
+|---|---|---|
+| `turn_180_left` | Come to 80 knots, then make a banking turn 180° to the left | 45s |
+| `hover_20s` | Come to a hover and maintain it for 20 seconds | 35s |
+| `level_70kt_20s` | Come to 70 knots and maintain level flight for 20 seconds | 30s |
+
+### Wiring checklist (per scene, after adding/changing coach components)
+
+1. On the helicopter GameObject (same one as `SimulatorDriver`): add
+   `FlightCoachAI` and/or `FlightCoachTester` (passive coach), and
+   `FlightTaskCoachAI` (Lesson coach) — both require `SimulatorDriver`.
+2. Somewhere in the scene: `HudCoachOutput` (bottom feedback panel) and
+   `LessonHUD` (top task bar).
+3. On `MainMenuManager`, under **Lesson mode**: **Lesson Coach** →
+   `FlightTaskCoachAI`, **Lesson HUD** → `LessonHUD`, **Passive Coach
+   Components** → `FlightCoachAI`/`FlightCoachTester`.
+4. Run **Window → SuperHeli → Setup Localization Tables** after adding new
+   Loc keys (`menu.lesson`, `task.*`).
+

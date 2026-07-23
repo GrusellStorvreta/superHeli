@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using Newtonsoft.Json;
 using UnityEngine;
@@ -18,9 +19,8 @@ namespace SimCore
     [RequireComponent(typeof(SimulatorDriver))]
     public class FlightCoachAI : MonoBehaviour
     {
-        public string model = "claude-opus-4-8";
+        public string model = "claude-haiku-4-5-20251001";
         public int maxTokens = 220;
-        public string effort = "low";
 
         public float sampleRate = 10f;    // Hz
         public float chunkInterval = 10f; // seconds
@@ -45,6 +45,7 @@ namespace SimCore
         private float chunkTimer;
         private float sessionStartTime;
         private bool requestInFlight;
+        private string logPath;
 
         void Awake()
         {
@@ -68,6 +69,10 @@ namespace SimCore
         void Start()
         {
             sessionStartTime = Time.time;
+
+            string dir = Path.Combine(Application.persistentDataPath, "BlackBox", "Coaching");
+            Directory.CreateDirectory(dir);
+            logPath = Path.Combine(dir, $"coaching_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
         }
 
         void FixedUpdate()
@@ -163,8 +168,7 @@ namespace SimCore
                 messages = new List<AnthropicMessage>
                 {
                     new AnthropicMessage { role = "user", content = csvChunk }
-                },
-                output_config = new OutputConfig { effort = effort }
+                }
             };
             string bodyJson = JsonConvert.SerializeObject(body);
 
@@ -181,7 +185,7 @@ namespace SimCore
 
                 if (req.result != UnityWebRequest.Result.Success)
                 {
-                    Debug.LogWarning($"[FlightCoachAI] request failed: {req.error}");
+                    Debug.LogWarning($"[FlightCoachAI] request failed: {req.error}\n{req.downloadHandler.text}");
                 }
                 else
                 {
@@ -191,6 +195,7 @@ namespace SimCore
                     {
                         Debug.Log($"[FlightCoachAI] coach: {comment}");
                         output?.Say(comment);
+                        LogComment(comment);
                     }
                     else
                     {
@@ -200,6 +205,13 @@ namespace SimCore
             }
 
             requestInFlight = false;
+        }
+
+        void LogComment(string comment)
+        {
+            if (logPath == null) return;
+            float t = Time.time - sessionStartTime;
+            File.AppendAllText(logPath, $"[{t:F1}s] {comment}\n\n");
         }
 
         static string TryParseComment(string responseJson)
@@ -224,18 +236,12 @@ namespace SimCore
             public string content;
         }
 
-        class OutputConfig
-        {
-            public string effort;
-        }
-
         class AnthropicRequest
         {
             public string model;
             public int max_tokens;
             public string system;
             public List<AnthropicMessage> messages;
-            public OutputConfig output_config;
         }
 
         class AnthropicContentBlock

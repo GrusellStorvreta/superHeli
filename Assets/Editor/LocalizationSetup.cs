@@ -20,6 +20,7 @@ public static class LocalizationSetup
         { "menu.subtitle",      "HELICOPTER SIMULATOR" },
         { "menu.free_flight",   "FREE FLIGHT" },
         { "menu.missions",      "MISSION MODE" },
+        { "menu.lesson",        "LESSON" },
         { "menu.settings",      "SETTINGS" },
         { "menu.quit",          "QUIT" },
         { "menu.back",          "← BACK" },
@@ -41,6 +42,7 @@ public static class LocalizationSetup
         // Mission result screen
         { "result.complete",    "MISSION COMPLETE" },
         { "result.timesup",     "TIME'S UP" },
+        { "result.landed_early","LANDED TOO SOON" },
         { "result.failed",      "MISSION FAILED" },
         { "result.time",        "Completed in  {0:F1} sec" },
         { "result.continue",    "CONTINUE  →  LEVEL {0}" },
@@ -72,6 +74,11 @@ public static class LocalizationSetup
         { "instr.land_pickup",  "Land and pick up survivors" },
         { "instr.return_base",  "Return to base" },
         { "instr.boarding",     "Boarding passengers..." },
+
+        // Flight task coach
+        { "task.turn_180_left",   "Come to 80 knots, then make a banking turn 180 degrees to the left" },
+        { "task.hover_20s",       "Come to a hover and maintain it for 20 seconds" },
+        { "task.level_70kt_20s",  "Come to 70 knots and maintain level flight for 20 seconds" },
     };
 
     [MenuItem("Window/SuperHeli/Setup Localization Tables")]

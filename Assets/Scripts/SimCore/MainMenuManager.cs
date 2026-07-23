@@ -19,6 +19,15 @@ namespace SimCore
         public MissionHUD      missionHUD;
         public SimulatorHUD[]  hudComponents;
 
+        [Header("Lesson mode")]
+        public FlightTaskCoachAI lessonCoach;
+        public LessonHUD         lessonHUD;
+        // Passive coach components (FlightCoachAI / FlightCoachTester) — whichever
+        // is enabled in the Inspector keeps running in Free Flight/Mission, but is
+        // suspended while Lesson mode's task-based coach owns the same HUD.
+        public Behaviour[] passiveCoachComponents;
+        private bool[] _passiveCoachPrevEnabled;
+
         private enum MenuPhase { Main, LevelSelect, Settings }
         private MenuPhase _menuPhase    = MenuPhase.Main;
         private bool      _inMenu       = true;
@@ -33,7 +42,7 @@ namespace SimCore
         private List<(int num, System.Func<string> name)> _levelList;
 
         private int LevelSelectButtonCount => (_levelList?.Count ?? 3) + 1; // levels + back
-        private int ButtonCount => _menuPhase == MenuPhase.Main     ? 4
+        private int ButtonCount => _menuPhase == MenuPhase.Main     ? 5
                                  : _menuPhase == MenuPhase.Settings ? 3
                                  : LevelSelectButtonCount;
 
@@ -109,8 +118,9 @@ namespace SimCore
             {
                 if (_selectedIndex == 0) StartGame(GameSettings.Mode.FreeFlight);
                 if (_selectedIndex == 1) { _menuPhase = MenuPhase.LevelSelect; _selectedIndex = 0; }
-                if (_selectedIndex == 2) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
-                if (_selectedIndex == 3) QuitGame();
+                if (_selectedIndex == 2) StartGame(GameSettings.Mode.Lesson);
+                if (_selectedIndex == 3) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
+                if (_selectedIndex == 4) QuitGame();
             }
             else if (_menuPhase == MenuPhase.LevelSelect)
             {
@@ -146,6 +156,37 @@ namespace SimCore
                 if (hud != null) hud.enabled = false;
             if (missionManager != null) missionManager.enabled = false;
             if (missionHUD     != null) missionHUD.enabled     = false;
+            SetLessonCoachActive(false);
+        }
+
+        // Suspends whichever passive coach (FlightCoachAI/FlightCoachTester) is
+        // enabled in the Inspector and hands the shared HUD to FlightTaskCoachAI,
+        // or restores the passive coach's prior enabled state when Lesson mode ends.
+        void SetLessonCoachActive(bool active)
+        {
+            if (lessonCoach != null) lessonCoach.enabled = active;
+            if (lessonHUD   != null) lessonHUD.enabled   = active;
+            if (passiveCoachComponents == null) return;
+
+            if (active)
+            {
+                _passiveCoachPrevEnabled = new bool[passiveCoachComponents.Length];
+                for (int i = 0; i < passiveCoachComponents.Length; i++)
+                {
+                    var c = passiveCoachComponents[i];
+                    if (c == null) continue;
+                    _passiveCoachPrevEnabled[i] = c.enabled;
+                    c.enabled = false;
+                }
+            }
+            else if (_passiveCoachPrevEnabled != null)
+            {
+                for (int i = 0; i < passiveCoachComponents.Length; i++)
+                {
+                    var c = passiveCoachComponents[i];
+                    if (c != null) c.enabled = _passiveCoachPrevEnabled[i];
+                }
+            }
         }
 
         void StartGame(GameSettings.Mode mode, int level = 1)
@@ -172,14 +213,19 @@ namespace SimCore
                 if (missionManager != null)
                 {
                     missionManager.enabled = true;
+                    // Guarantee a confirmed reset before the mission starts evaluating
+                    // tasks, same as the result screen's retry/continue buttons already
+                    // do — MissionManager.Update() waits on driver.IsResetPending.
+                    driver?.ResetToSpawnPoint();
                     missionManager.Initialize(level);
                 }
                 if (missionHUD != null) missionHUD.enabled = true;
             }
             else
             {
-                // Free Flight: Level 7 NPCs hidden, instructor visible
+                // Free Flight and Lesson: Level 7 NPCs hidden, instructor visible
                 if (missionManager != null) missionManager.ApplyDefaultCabinState();
+                SetLessonCoachActive(mode == GameSettings.Mode.Lesson);
             }
         }
 
@@ -197,7 +243,7 @@ namespace SimCore
 
             float panW = 380f;
             float gap  = 68f;
-            float panH = _menuPhase == MenuPhase.Main     ? 460f
+            float panH = _menuPhase == MenuPhase.Main     ? 528f
                        : _menuPhase == MenuPhase.Settings ? 410f
                        : 140f + gap * LevelSelectButtonCount + 30f;
             float px = (sw - panW) * 0.5f;
@@ -218,8 +264,9 @@ namespace SimCore
             {
                 if (_theme.DrawButton(new Rect(bx, by,           btnW, btnH), Loc.Get("menu.free_flight"), _selectedIndex == 0)) StartGame(GameSettings.Mode.FreeFlight);
                 if (_theme.DrawButton(new Rect(bx, by + gap,     btnW, btnH), Loc.Get("menu.missions"),    _selectedIndex == 1)) { _menuPhase = MenuPhase.LevelSelect; _selectedIndex = 0; }
-                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), Loc.Get("menu.settings"),    _selectedIndex == 2)) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
-                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), Loc.Get("menu.quit"),        _selectedIndex == 3)) QuitGame();
+                if (_theme.DrawButton(new Rect(bx, by + gap * 2, btnW, btnH), Loc.Get("menu.lesson"),      _selectedIndex == 2)) StartGame(GameSettings.Mode.Lesson);
+                if (_theme.DrawButton(new Rect(bx, by + gap * 3, btnW, btnH), Loc.Get("menu.settings"),    _selectedIndex == 3)) { _menuPhase = MenuPhase.Settings;    _selectedIndex = 0; }
+                if (_theme.DrawButton(new Rect(bx, by + gap * 4, btnW, btnH), Loc.Get("menu.quit"),        _selectedIndex == 4)) QuitGame();
             }
             else if (_menuPhase == MenuPhase.LevelSelect)
             {

@@ -2,7 +2,7 @@ namespace SimCore
 {
     public static class GameSettings
     {
-        public enum Mode { FreeFlight, Mission }
+        public enum Mode { FreeFlight, Mission, Lesson }
         public static Mode CurrentMode  = Mode.FreeFlight;
         public static int  CurrentLevel = 1;
 

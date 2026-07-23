@@ -8,12 +8,13 @@ namespace SimCore
     public class HudCoachOutput : MonoBehaviour, ICoachOutput
     {
         public float displaySeconds = 12f;
+        public float panelWidth = 560f;
+        public float minPanelHeight = 90f;
+        public float maxPanelHeight = 220f;
+        public int fontSize = 18;
 
         private static readonly Color Amber     = new Color(1f, 0.78f, 0.08f);
         private static readonly Color DarkPanel = new Color(0.04f, 0.06f, 0.1f, 0.82f);
-
-        private const float PanelW = 420f;
-        private const float PanelH = 90f;
 
         private GUIStyle  textStyle;
         private Texture2D bgTex;
@@ -25,7 +26,7 @@ namespace SimCore
             bgTex = MakeTex(DarkPanel);
             textStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize  = 15,
+                fontSize  = fontSize,
                 fontStyle = FontStyle.Bold,
                 wordWrap  = true,
                 alignment = TextAnchor.MiddleLeft,
@@ -44,11 +45,15 @@ namespace SimCore
             if (string.IsNullOrEmpty(message) || Time.time >= hideAt) return;
             if (textStyle == null || bgTex == null) BuildStyles();
 
-            float px = 16f;
-            float py = Screen.height - PanelH - 16f;
+            float contentWidth = panelWidth - 24f;
+            float textHeight   = textStyle.CalcHeight(new GUIContent(message), contentWidth);
+            float boxHeight    = Mathf.Clamp(textHeight + 16f, minPanelHeight, maxPanelHeight);
 
-            GUI.DrawTexture(new Rect(px, py, PanelW, PanelH), bgTex);
-            GUI.Label(new Rect(px + 12f, py + 8f, PanelW - 24f, PanelH - 16f), message, textStyle);
+            float px = 16f;
+            float py = Screen.height - boxHeight - 16f;
+
+            GUI.DrawTexture(new Rect(px, py, panelWidth, boxHeight), bgTex);
+            GUI.Label(new Rect(px + 12f, py + 8f, contentWidth, boxHeight - 16f), message, textStyle);
         }
 
         static Texture2D MakeTex(Color c)
