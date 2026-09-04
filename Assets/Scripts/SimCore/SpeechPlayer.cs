@@ -72,18 +72,28 @@ namespace SimCore
                 if (e.token != token || e.clips == null || e.clips.Length == 0) continue;
                 var clip = NextClip(e);
                 if (clip == null) return;
-
-                audioSource.PlayOneShot(clip);
-
-                if (_speakingRoutine != null) StopCoroutine(_speakingRoutine);
-                _speakingRoutine = StartCoroutine(TrackSpeaking(clip.length));
-
-                if (crackleSource != null && crackles != null && crackles.Length > 0 && Random.value < 0.3f)
-                {
-                    if (_crackleRoutine != null) StopCoroutine(_crackleRoutine);
-                    _crackleRoutine = StartCoroutine(PlayCrackles(clip.length));
-                }
+                PlayClip(clip);
                 return;
+            }
+        }
+
+        // Plays any AudioClip through the same AudioSource/filters/crackle
+        // logic used for canned phrases — the seam TtsCoachOutput hooks into
+        // so dynamically-synthesized speech gets the exact same radio effect
+        // and Interior-mixer routing as pre-recorded lines.
+        public void PlayClip(AudioClip clip)
+        {
+            if (audioSource == null || clip == null) return;
+
+            audioSource.PlayOneShot(clip);
+
+            if (_speakingRoutine != null) StopCoroutine(_speakingRoutine);
+            _speakingRoutine = StartCoroutine(TrackSpeaking(clip.length));
+
+            if (crackleSource != null && crackles != null && crackles.Length > 0 && Random.value < 0.3f)
+            {
+                if (_crackleRoutine != null) StopCoroutine(_crackleRoutine);
+                _crackleRoutine = StartCoroutine(PlayCrackles(clip.length));
             }
         }
 

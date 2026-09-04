@@ -12,6 +12,8 @@ This guide explains how to assemble a working gameplay scene from scratch using 
 | Render Pipeline | High Definition Render Pipeline (HDRP) |
 | Input System | Unity Input System package (new, not legacy) — enable in Project Settings → Player → Active Input Handling → **Both** or **Input System Package** |
 | Required packages | Unity Input System, HDRP |
+| `ANTHROPIC_API_KEY` env var | Required for `FlightCoachAI`/`FlightTaskCoachAI` (AI flight coach). GUI-launched Unity Editor (Dock/Finder) doesn't inherit shell-profile exports — launch from a terminal where it's exported, or `launchctl setenv ANTHROPIC_API_KEY "..."`. |
+| `ELEVENLABS_API_KEY` env var | Required for `TtsCoachOutput` (spoken coach voice). Same GUI-launch caveat as above. |
 
 ---
 
@@ -62,6 +64,9 @@ This is the helicopter's root GameObject. It must have a **Rigidbody**.
 | `MissionHUD` | Mission overlay (task text, timer, hover progress). **Disable by default.** |
 | `MissionResultScreen` | Success/failure result screen with badge and navigation buttons. Always enabled. |
 | `SnowWashEffect` | Snow particle effect driven by AGL. Attach to the Particle System child object on the helicopter. |
+| `FlightCoachAI` | Passive AI flight coach — general commentary on a timer. Requires `SimulatorDriver` on this GameObject. Mutually exclusive with `FlightCoachTester` (toggle one on at a time) — see "AI Flight Coach & Lesson Mode" section. |
+| `FlightCoachTester` | Free canned-phrase substitute for `FlightCoachAI` — no API calls, for testing the display/voice pipeline. |
+| `FlightTaskCoachAI` | Lesson-mode task coach. Requires `SimulatorDriver` on this GameObject. |
 
 #### SimulatorDriver — Inspector fields
 
@@ -234,6 +239,17 @@ Empty GameObject at root level. Attach:
 | Mission Manager | Drag in **MissionManager** |
 | Mission HUD | Drag in **MissionHUD** |
 | Hud Components | Drag in all **SimulatorHUD** components |
+| Lesson Coach | Drag in **FlightTaskCoachAI** (on PlayerHelicopter) |
+| Lesson HUD | Drag in **LessonHUD** |
+| Flight Coach AI | Drag **PlayerHelicopter** (resolves the `FlightCoachAI` component specifically) — suspended while Lesson mode runs, restored on exit |
+| Flight Coach Tester | Drag **PlayerHelicopter** (resolves the `FlightCoachTester` component specifically) — same suspend/restore behavior |
+
+> **Drag the whole PlayerHelicopter GameObject onto each field** — since both
+> fields are typed as the exact component class, Unity resolves the correct
+> one automatically even though PlayerHelicopter hosts many other scripts.
+> (This replaced an earlier `Behaviour[]` array field that had to be wired
+> per-component and could silently grab the wrong one — see the note in
+> `CLAUDE.md`'s AI-coach section.)
 
 > PauseManager has no Inspector fields — just add it as a component.
 
@@ -376,6 +392,65 @@ States: `Waving` (default, loop), `Walking`. Transition: **Any State → Walking
 
 ---
 
+## AI Flight Coach & Lesson Mode — Additional Setup
+
+See `CLAUDE.md`'s "AI flight coach & Lesson mode" section for the full
+architecture explanation. This section is just the scene-wiring steps.
+
+### On PlayerHelicopter (same GameObject as `SimulatorDriver`)
+
+Add `FlightCoachAI` and/or `FlightCoachTester` (passive coach — enable one at
+a time), and `FlightTaskCoachAI` (Lesson coach). None of these three need any
+Inspector fields wired — they resolve `SimulatorDriver`/`Rigidbody` via
+`GetComponent` and find their output automatically (see below).
+
+### Coach output components (place on GameManager, alongside MainMenuManager/PauseManager)
+
+| Component | Inspector fields | Notes |
+|---|---|---|
+| `HudCoachOutput` | none required | Bottom-left text panel. |
+| `LessonHUD` | none required | Top-center task bar for Lesson mode; auto-finds `FlightTaskCoachAI`. |
+| `CoachOutputBroadcaster` | **Hud Output** → drag in `HudCoachOutput`; **Tts Output** → drag in `TtsCoachOutput` (leave empty if not using voice) | **Required even if you only want text** — `FlightCoachAI`/`FlightTaskCoachAI`/`FlightCoachTester` resolve their output *only* via `FindObjectOfType<CoachOutputBroadcaster>()`. A scene without one has no coach output at all, text included. |
+| `TtsCoachOutput` | **Voice Id** → from your ElevenLabs account (Voice Library / My Voices); **Speech Player** → drag in the same `SpeechPlayer` `FlightInstructor` already uses (or leave empty — auto-found via `FindObjectOfType`); **Voice Enabled** → on/off mute switch | Optional — only add if you want spoken coaching. Reuses `SpeechPlayer`'s existing AudioSource/radio filters, so no separate AudioSource or mixer routing is needed for this component. |
+
+> **Do not put `HudCoachOutput` (or any other `ICoachOutput`) directly on
+> `PlayerHelicopter`.** It only needs to exist wherever `CoachOutputBroadcaster`
+> can reference it (e.g. GameManager). This used to matter more — the coaches
+> briefly used to check for an `ICoachOutput` on their own GameObject before
+> falling back to the broadcaster — but that check has been removed, so it's
+> just scene hygiene now, not a functional trap.
+
+> Neither `CoachOutputBroadcaster` nor `TtsCoachOutput` show Unity's usual
+> component enable/disable checkbox in the Inspector — that checkbox only
+> appears for scripts with `Update`/`FixedUpdate`/`LateUpdate`/`OnGUI`/
+> `OnEnable`/`OnDisable`, none of which either of these has. This is expected,
+> not a bug. To mute voice specifically, use `TtsCoachOutput`'s **Voice
+> Enabled** field (a dedicated bool), not a component checkbox.
+
+> `TtsCoachOutput` depends on a `SpeechPlayer` already existing in the scene
+> (it's on whatever GameObject hosts `FlightInstructor` — not otherwise
+> covered in this guide). If that GameObject/component doesn't exist yet,
+> `TtsCoachOutput` disables itself with a `Debug.LogWarning` rather than
+> erroring.
+
+### On MainMenuManager
+
+See the updated Inspector-fields table above — **Lesson Coach**, **Lesson
+HUD**, **Flight Coach AI**, and **Flight Coach Tester** all need wiring for
+Lesson mode to work at all (independent of whether voice is set up).
+
+### Quick checklist
+
+1. `FlightCoachAI`/`FlightCoachTester` + `FlightTaskCoachAI` → PlayerHelicopter
+2. `HudCoachOutput`, `LessonHUD`, `CoachOutputBroadcaster` → GameManager (or similar)
+3. `CoachOutputBroadcaster` → **Hud Output** = `HudCoachOutput`, **Tts Output** = `TtsCoachOutput`
+4. `TtsCoachOutput` (optional) → GameManager; set **Voice Id**; confirm **Speech Player** resolves
+5. `MainMenuManager` → **Lesson Coach** / **Lesson HUD** / **Flight Coach AI** / **Flight Coach Tester** wired
+6. `ANTHROPIC_API_KEY` set (coach text/logic); `ELEVENLABS_API_KEY` set (voice, if used)
+7. **Window → SuperHeli → Setup Localization Tables** run at least once (`menu.lesson`, `task.*` keys)
+
+---
+
 ## Build Settings
 
 Add all scenes to **File → Build Settings**:
@@ -414,3 +489,10 @@ Ensure FirstLevel is **index 0** in the build list.
 | NPCPatrol | NPC root (wandering NPCs) |
 | WandererNPC | NPC root (backflip wanderer) |
 | Level7NPCController | Level7_NPCs root (starts inactive) |
+| FlightCoachAI | PlayerHelicopter |
+| FlightCoachTester | PlayerHelicopter |
+| FlightTaskCoachAI | PlayerHelicopter |
+| HudCoachOutput | GameManager |
+| LessonHUD | GameManager |
+| CoachOutputBroadcaster | GameManager |
+| TtsCoachOutput | GameManager (optional — voice) |

@@ -60,10 +60,9 @@ namespace SimCore
                 return;
             }
 
-            output = GetComponent<ICoachOutput>();
-            if (output == null) output = FindObjectOfType<HudCoachOutput>();
+            output = FindObjectOfType<CoachOutputBroadcaster>();
             if (output == null)
-                Debug.LogWarning("[FlightCoachAI] No ICoachOutput found — coaching comments will only be logged.");
+                Debug.LogWarning("[FlightCoachAI] No CoachOutputBroadcaster found — coaching comments will only be logged.");
         }
 
         void Start()

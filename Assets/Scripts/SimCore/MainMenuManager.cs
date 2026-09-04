@@ -22,11 +22,18 @@ namespace SimCore
         [Header("Lesson mode")]
         public FlightTaskCoachAI lessonCoach;
         public LessonHUD         lessonHUD;
-        // Passive coach components (FlightCoachAI / FlightCoachTester) — whichever
-        // is enabled in the Inspector keeps running in Free Flight/Mission, but is
+        // Passive coach (FlightCoachAI / FlightCoachTester) — whichever is
+        // enabled in the Inspector keeps running in Free Flight/Mission, but is
         // suspended while Lesson mode's task-based coach owns the same HUD.
-        public Behaviour[] passiveCoachComponents;
-        private bool[] _passiveCoachPrevEnabled;
+        // Explicit concrete-typed fields, not a Behaviour[]/MonoBehaviour[]
+        // array: dragging a GameObject onto a broad-typed field resolves to
+        // an arbitrary component of that type on the object (GetComponent
+        // semantics), which silently grabbed the wrong component (e.g.
+        // HelicopterPlayer) when both live on the same crowded GameObject.
+        public FlightCoachAI     flightCoachAI;
+        public FlightCoachTester flightCoachTester;
+        private bool _flightCoachAIPrevEnabled;
+        private bool _flightCoachTesterPrevEnabled;
 
         private enum MenuPhase { Main, LevelSelect, Settings }
         private MenuPhase _menuPhase    = MenuPhase.Main;
@@ -166,26 +173,24 @@ namespace SimCore
         {
             if (lessonCoach != null) lessonCoach.enabled = active;
             if (lessonHUD   != null) lessonHUD.enabled   = active;
-            if (passiveCoachComponents == null) return;
 
             if (active)
             {
-                _passiveCoachPrevEnabled = new bool[passiveCoachComponents.Length];
-                for (int i = 0; i < passiveCoachComponents.Length; i++)
+                if (flightCoachAI != null)
                 {
-                    var c = passiveCoachComponents[i];
-                    if (c == null) continue;
-                    _passiveCoachPrevEnabled[i] = c.enabled;
-                    c.enabled = false;
+                    _flightCoachAIPrevEnabled = flightCoachAI.enabled;
+                    flightCoachAI.enabled = false;
+                }
+                if (flightCoachTester != null)
+                {
+                    _flightCoachTesterPrevEnabled = flightCoachTester.enabled;
+                    flightCoachTester.enabled = false;
                 }
             }
-            else if (_passiveCoachPrevEnabled != null)
+            else
             {
-                for (int i = 0; i < passiveCoachComponents.Length; i++)
-                {
-                    var c = passiveCoachComponents[i];
-                    if (c != null) c.enabled = _passiveCoachPrevEnabled[i];
-                }
+                if (flightCoachAI != null) flightCoachAI.enabled = _flightCoachAIPrevEnabled;
+                if (flightCoachTester != null) flightCoachTester.enabled = _flightCoachTesterPrevEnabled;
             }
         }
 

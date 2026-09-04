@@ -118,6 +118,8 @@ the player (`Say(string)`). Two producers, two displays, sharing that seam:
 | `FlightTaskCoachAI` | Lesson-mode coach — cycles a sequential, in-code list of maneuvers, each with its own timing window; buffers telemetry for that window, then asks Claude to judge the attempt against the *assigned* task. |
 | `HudCoachOutput` | Bottom-left amber panel. Displays whatever `Say()` is called with (coach commentary or task feedback). Panel height auto-sizes to the message (`minPanelHeight`/`maxPanelHeight`), so keep replies short. |
 | `LessonHUD` | Top-center bar (mission-instruction style) showing `FlightTaskCoachAI.CurrentTaskText` + `TimeRemaining`. Self-gates on `coach.enabled` — inert outside Lesson mode. |
+| `CoachOutputBroadcaster` | Fans a single `Say()` call out to every configured `ICoachOutput` (e.g. `HudCoachOutput` + `TtsCoachOutput`) — the seam `FlightCoachAI`/`FlightTaskCoachAI`/`FlightCoachTester` fall back to instead of `HudCoachOutput` directly. |
+| `TtsCoachOutput` | Speaks the coach's comment aloud via the ElevenLabs API, routed through the existing `SpeechPlayer.audioSource` so it gets the identical radio effect (high-pass, dynamic distortion, crackle, Interior mixer group) as pre-recorded phrases — no separate AudioSource or mixer wiring needed. |
 
 Both AI coaches only sample/send while `GameSettings.SimulationMode` is on
 (Arcade physics isn't what real telemetry coaching should be judging), and both
@@ -131,6 +133,27 @@ the Editor from a terminal where the var is exported, or
 `output_config`/`effort` field to the request — that parameter is only
 supported by reasoning-capable models (e.g. Opus); on Haiku it's an
 HTTP 400 (`"This model does not support the effort parameter"`).
+
+**Voice (`TtsCoachOutput`):** requires `ELEVENLABS_API_KEY` in the environment
+(same macOS GUI-launch caveat as `ANTHROPIC_API_KEY` above) and a **Voice Id**
+filled in on the component from your own ElevenLabs account — this cannot be
+defaulted or guessed. Missing either disables the component with a
+`Debug.LogWarning`, same convention as the Claude coaches. **Use a voice from
+"My Voices," not a shared Voice Library voice** — the latter returns HTTP 402
+("Free users cannot use library voices via the API") on free-tier accounts;
+this is an ElevenLabs account/billing restriction, not a bug in this code.
+Uses `eleven_flash_v2_5` (low-latency/cost model) and `pcm_22050` output —
+deliberately below the 44.1k/48k PCM/WAV tier gate on ElevenLabs' Pro+ plans.
+Text and voice run together, not one replacing the other — `HudCoachOutput`'s
+text is synchronous and appears instantly, while the spoken line lags behind
+it by the ElevenLabs request's round-trip time; that's expected, not a bug.
+Unchecking `TtsCoachOutput`'s **Voice Enabled** field turns voice off (text
+keeps working) without touching the broadcaster wiring — a free mute switch
+if ElevenLabs cost/latency becomes a concern (this doubles the external API
+surface per coaching comment: one Claude call, one ElevenLabs call). Note
+this is a dedicated bool field, not the component's own enable/disable
+checkbox — `TtsCoachOutput` has no `Update`/`OnGUI`, so Unity doesn't show
+that checkbox at all, same reason `CoachOutputBroadcaster` doesn't either.
 
 **Logging:** both coaches append plaintext transcripts under
 `~/Library/Application Support/DefaultCompany/superHeli/BlackBox/Coaching/`
@@ -165,8 +188,46 @@ an Inspector-editable/reorderable list is a natural next step if needed):
 2. Somewhere in the scene: `HudCoachOutput` (bottom feedback panel) and
    `LessonHUD` (top task bar).
 3. On `MainMenuManager`, under **Lesson mode**: **Lesson Coach** →
-   `FlightTaskCoachAI`, **Lesson HUD** → `LessonHUD`, **Passive Coach
-   Components** → `FlightCoachAI`/`FlightCoachTester`.
+   `FlightTaskCoachAI`, **Lesson HUD** → `LessonHUD`, **Flight Coach AI** /
+   **Flight Coach Tester** → whichever passive coach(es) exist on
+   PlayerHelicopter (each field resolves that exact component type
+   unambiguously, even when dragging the whole GameObject — see note below).
 4. Run **Window → SuperHeli → Setup Localization Tables** after adding new
    Loc keys (`menu.lesson`, `task.*`).
+5. Add a `CoachOutputBroadcaster` somewhere in the scene. Wire its **Hud
+   Output** field to `HudCoachOutput` (always) and **Tts Output** to
+   `TtsCoachOutput` (if voice is set up). Required even for text-only setups
+   — `FlightCoachAI`/`FlightTaskCoachAI`/`FlightCoachTester` resolve their
+   output via `FindObjectOfType<CoachOutputBroadcaster>()`, exclusively; a
+   scene without a broadcaster loses coach text entirely, not just voice.
+
+> **Don't put an `ICoachOutput`-implementing component (e.g. `HudCoachOutput`)
+> directly on the same GameObject as a coach** (`FlightCoachAI`/
+> `FlightTaskCoachAI`/`FlightCoachTester`). Earlier versions of this code
+> checked `GetComponent<ICoachOutput>()` on the coach's own GameObject before
+> falling back to `FindObjectOfType<CoachOutputBroadcaster>()` — a stray
+> `HudCoachOutput` left on `PlayerHelicopter` from before the broadcaster
+> existed silently shortcut past it, so voice (and any future outputs) never
+> ran even though text kept working, with zero related Console output. That
+> `GetComponent` check has been removed — the coaches now *only* resolve via
+> `CoachOutputBroadcaster` — so this can't happen again regardless of what
+> else ends up on that GameObject.
+
+> **Why explicit fields, not arrays**: `MainMenuManager`'s passive-coach
+> field and `CoachOutputBroadcaster`'s output fields are deliberately typed
+> as concrete component types (`FlightCoachAI`, `TtsCoachOutput`, etc.), not
+> a `Behaviour[]`/`MonoBehaviour[]` array. When several scripts share one
+> crowded GameObject (as they do here on `PlayerHelicopter`), dragging the
+> whole GameObject onto a broad-typed field resolves to *some* component of
+> that type via `GetComponent` — not necessarily the one you meant — since
+> the Hierarchy only lets you drag GameObjects, not a specific component.
+> This actually happened once already: a `Behaviour[]` field silently grabbed
+> `HelicopterPlayer` instead of `FlightCoachAI`, which stopped rotor
+> animation specifically in Lesson mode. Concrete-typed fields don't have
+> this ambiguity.
+6. If adding voice: add `TtsCoachOutput` to the scene, set **Voice Id** (from
+   your ElevenLabs account), and confirm **Speech Player** resolves to the
+   same `SpeechPlayer` `FlightInstructor` already uses (auto-found via
+   `FindObjectOfType<SpeechPlayer>()` if left empty) — using a different one
+   would mean the radio effect isn't actually shared/identical.
 

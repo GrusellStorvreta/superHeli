@@ -24,10 +24,9 @@ namespace SimCore
 
         void Awake()
         {
-            output = GetComponent<ICoachOutput>();
-            if (output == null) output = FindObjectOfType<HudCoachOutput>();
+            output = FindObjectOfType<CoachOutputBroadcaster>();
             if (output == null)
-                Debug.LogWarning("[FlightCoachTester] No ICoachOutput found — nothing to display.");
+                Debug.LogWarning("[FlightCoachTester] No CoachOutputBroadcaster found — nothing to display.");
         }
 
         void Update()
